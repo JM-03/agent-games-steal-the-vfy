@@ -1,0 +1,31 @@
+{
+  "author": "",
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "snarkjs": "^0.7.6",
+    "viem": "^2.57.19"
+  },
+  "description": "Steal the VFY agent for zkVerify Agent Games \u2014 signed turn endpoint, conservative default strategy, Groth16 policy-proof wiring (snarkjs + Kurier).",
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "keywords": [],
+  "license": "UNLICENSED",
+  "main": "dist/index.js",
+  "name": "agent-games-steal-the-vfy",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "commitment": "node scripts/commitment.cjs",
+    "dev": "tsx watch src/index.ts",
+    "probe": "node scripts/probe-circuit-inputs.cjs",
+    "start": "node dist/index.js",
+    "test": "AGENT_GAMES_HMAC_SECRET=test-secret-for-tests-only-123 STRATEGY_COMMITMENT_HASH=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PROOF_ENABLED=false tsx --test test/agent.test.ts"
+  },
+  "type": "commonjs",
+  "version": "1.0.0"
+}
