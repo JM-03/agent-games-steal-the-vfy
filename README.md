@@ -25,6 +25,13 @@ GitHub `JM-03`.
 yang di-commit sebelum match — lawan dan wasit bisa memverifikasi tiap
 langkah tanpa melihat isi strateginya.
 
+**Di luar game:** polanya umum — agent apa pun yang aksinya harus terbukti
+terikat pada kebijakan yang di-commit sebelum bertindak (bot trading yang
+dibatasi loss limit, agent governance yang terikat mandat hasil voting,
+agent game yang terikat aturan main) bisa commit ke kebijakannya dengan
+hash Poseidon dan membuktikan tiap aksi terhadap circuit resmi, tanpa
+membuka isi kebijakannya.
+
 ## Cara kerja (ringkas)
 
 1. Sebelum match, pemilik memilih 8 angka strategi (`strategyParams`) dan
@@ -175,9 +182,8 @@ produksi memang jalan terus.
 - Idempotency disimpan di **Map in-memory** (`src/turn.ts`) — hilang saat
   server restart/redeploy. Untuk produksi sebaiknya pakai store persisten
   (SQLite/Postgres).
-- **Dockerfile belum diuji build-nya** — Docker tidak tersedia di mesin
-  ini. Railway akan build dari Dockerfile ini; kalau gagal, cek log
-  Railway.
+- **Dockerfile sudah terbukti build di Railway** — deployment 14 Nov 2026
+  (552675ed) build dari Dockerfile ini dan berjalan.
 
 ## Keamanan
 
