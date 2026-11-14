@@ -13,6 +13,7 @@
 //     failures, so a repeated key must return the SAME response.
 //   - The commitment hash in the envelope must match the one registered
 //     before pairing; a mismatch means this agent is not the paired one.
+import { createHash } from "node:crypto";
 import { config } from "./config";
 import { computePublicInputsHash } from "./publicInputsHash";
 import { decideAction, toStrategyContext } from "./strategy";
@@ -29,10 +30,21 @@ export interface TurnOutcome {
 
 const seenKeys = new Map<string, TurnOutcome>();
 
-function deriveIdempotencyKey(envelope: TurnEnvelope): string {
+/**
+ * Deterministic UUIDv5-style idempotency key for one turn.
+ * SHA-256 over "matchId:turn", formatted as a UUID with the version (5)
+ * and variant bits set. A platform retry reuses the same key (same
+ * response is returned from the cache); a new turn never reuses one.
+ * A key sent by the platform itself always wins over the derived one.
+ */
+export function deriveIdempotencyKey(envelope: TurnEnvelope): string {
   if (envelope.idempotencyKey) return envelope.idempotencyKey;
-  if (envelope.taskId) return envelope.taskId;
-  return `${envelope.matchId}:${envelope.turn}:${envelope.nonce ?? ""}`;
+  const digest = createHash("sha256").update(`${envelope.matchId}:${envelope.turn}`, "utf8").digest();
+  // Set UUID version 5 and RFC 4122 variant bits.
+  digest[6] = (digest[6] & 0x0f) | 0x50;
+  digest[8] = (digest[8] & 0x3f) | 0x80;
+  const hex = digest.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
 function isExpired(envelope: TurnEnvelope): boolean {
@@ -160,7 +172,7 @@ export async function handleTurn(envelope: TurnEnvelope): Promise<TurnOutcome> {
     return finish({
       response: baseResponse({ circuitVersion: config.circuitVersion, publicInputsHash: hash }),
       proofStatus: "no-proof",
-      reason: "PROOF_ENABLED=false (circuit inputs incomplete) -> action returned without a Groth16 proof; platform will score it as HOLD",
+      reason: "PROOF_ENABLED=false -> action returned without a Groth16 proof; platform will score it as HOLD",
     });
   }
 

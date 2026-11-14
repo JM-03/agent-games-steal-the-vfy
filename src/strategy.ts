@@ -1,4 +1,4 @@
-// Default strategy for Steal the VFY.
+// Strategy for Steal the VFY — DRIVEN BY THE CIRCUIT, not by free choice.
 //
 // READ THIS FIRST — the official Build page says the strategy is the owner's
 // TODO on purpose: "for Steal the VFY the prompt deliberately leaves your
@@ -6,15 +6,24 @@
 // vibecoded strategy isn't a strategy."
 // (https://agentgames.zkverify.io/build, section 01.5)
 //
-// The rules below are ONE simple, conservative starting point. They are NOT
-// optimal and NOT a winning strategy. They exist so the agent has a
-// deterministic, explainable behaviour while you develop a real one.
+// AND the vfy-policy circuit ENFORCES one decision list for the committed
+// strategyParams (verified 2026-11-14 against the official circuit — see
+// CIRCUIT_NOTES.md). The agent MUST return the action that list produces
+// for the configured params, or fullProve throws the circuit assert and
+// no proof is generated:
 //
-// What the agent can actually see in a turn envelope (official spec):
-//   - turn number (1..20), both balances (start 100 each), and whether
-//     either side is fortified until a given turn.
-// It CANNOT see: the opponent's past actions, the opponent's strategy, or
-// any history. So every rule below uses only turn + balances + fortify flags.
+//   1. FORTIFY when selfBalance < params[1]
+//   2. else HOLD when opponentBalance <= params[2] OR params[3] == 1
+//   3. else EXTRACT with amount == params[0] exactly
+//
+// With the default params [10,0,0,0,0,0,0,0] that means: always EXTRACT 10,
+// except HOLD when the opponent's balance is 0. FORTIFY is unreachable
+// with params[1] = 0. To demonstrate FORTIFY, use params with [1] > 0,
+// e.g. [10,70,0,0,0,0,0,0] (FORTIFY while selfBalance < 70).
+//
+// The agent can only see turn + balances + fortify flags in an envelope
+// (no opponent history). The circuit list uses only the balances, so the
+// fortify flags are intentionally ignored here.
 //
 // Game facts used (official event page):
 //   - FORTIFY costs 2 VFY and blocks up to 6 VFY of incoming extraction.
@@ -25,28 +34,21 @@
 //     only, never arrival order. Highest balance after 20 turns wins.
 //   - Match win +18, draw +9, loss +3 (plus small reliability bonuses).
 //
-// DEFAULT STRATEGY — in plain words, in priority order:
-//   1. Late and behind (turn >= 18 and selfBalance < opponentBalance):
-//      EXTRACT 10 — the only way to close a gap before the match ends.
-//   2. Opponent is fortified this turn: HOLD — extracting into a fortified
-//      opponent loses up to 6 of the gain, so a free pass is better.
-//   3. Comfortably ahead (lead >= 10) on every 3rd turn: FORTIFY —
-//      protect the lead against the opponent's catch-up extraction.
-//   4. Clearly behind (deficit >= 10): EXTRACT 10 — chase the leader.
-//   5. Otherwise: EXTRACT 5 — the steady middle amount.
-//
-// To change the strategy, edit ONLY the `decideAction` function below, then
-// re-run `npm run commitment` and register the new commitment hash in the
-// dashboard BEFORE the next round is paired. The commitment is frozen
+// To change the strategy, change STRATEGY_PARAMS (env), re-run
+// `npm run commitment` to generate a fresh salt + commitment, and register
+// the new commitment hash BEFORE the next pairing. The commitment is frozen
 // mid-match, so a strategy change only takes effect from the next pairing.
+import { config } from "./config";
+import { DEFAULT_STRATEGY_PARAMS, validateStrategyParams } from "./strategyParams";
 import type { Action, ActionType, TurnState } from "./types";
 
-export const STRATEGY_NAME = "conservative-default-v1";
+export { DEFAULT_STRATEGY_PARAMS };
+
+export const STRATEGY_NAME = "circuit-policy-v1";
 export const STRATEGY_DESCRIPTION =
-  "Late-and-behind: EXTRACT 10. Opponent fortified: HOLD. Ahead by >=10 every 3rd turn: FORTIFY. Behind by >=10: EXTRACT 10. Otherwise: EXTRACT 5.";
+  "Circuit-enforced policy from STRATEGY_PARAMS: FORTIFY when selfBalance < params[1]; else HOLD when opponentBalance <= params[2] or params[3] == 1; else EXTRACT params[0]. Default [10,0,0,0,0,0,0,0] = always EXTRACT 10 (HOLD only at opponent balance 0).";
 
 export const EXTRACT_MAX = 10;
-export const EXTRACT_DEFAULT = 5;
 export const FORTIFY_COST = 2;
 export const FORTIFY_BLOCK = 6;
 export const MATCH_TURNS = 20;
@@ -69,22 +71,23 @@ export function toStrategyContext(turn: number, state: TurnState): StrategyConte
   };
 }
 
-/** The ONE function that decides the action. Edit this to change strategy. */
-export function decideAction(ctx: StrategyContext): Action {
-  const lead = ctx.selfBalance - ctx.opponentBalance;
-  const opponentFortified =
-    ctx.opponentFortifiedUntilTurn !== null && ctx.turn <= ctx.opponentFortifiedUntilTurn;
+/**
+ * The circuit's decision list for explicit params. Pure — no env access,
+ * so tests can cover every branch with any params.
+ */
+export function decideActionFromParams(ctx: StrategyContext, params: number[]): Action {
+  const p = validateStrategyParams(params);
+  // 1. FORTIFY when selfBalance < params[1].
+  if (ctx.selfBalance < p[1]) return { type: "FORTIFY" };
+  // 2. HOLD when opponentBalance <= params[2] OR params[3] == 1.
+  if (ctx.opponentBalance <= p[2] || p[3] === 1) return { type: "HOLD" };
+  // 3. EXTRACT with amount == params[0] exactly.
+  return { type: "EXTRACT", amount: p[0] };
+}
 
-  // 1. Late and behind: go for the maximum extraction.
-  if (ctx.turn >= 18 && lead < 0) return { type: "EXTRACT", amount: EXTRACT_MAX };
-  // 2. Opponent is fortified: extraction is blunted, take the free pass.
-  if (opponentFortified) return { type: "HOLD" };
-  // 3. Comfortably ahead: spend 2 VFY to protect the lead every 3rd turn.
-  if (lead >= 10 && ctx.turn % 3 === 0) return { type: "FORTIFY" };
-  // 4. Clearly behind: chase with the maximum extraction.
-  if (lead <= -10) return { type: "EXTRACT", amount: EXTRACT_MAX };
-  // 5. Default: steady middle extraction.
-  return { type: "EXTRACT", amount: EXTRACT_DEFAULT };
+/** The ONE function that decides the action, using the configured params. */
+export function decideAction(ctx: StrategyContext): Action {
+  return decideActionFromParams(ctx, config.strategyParams);
 }
 
 export function actionTypeOf(action: Action): ActionType {
@@ -96,21 +99,19 @@ export function actionAmountForHash(action: Action): number {
   return action.type === "EXTRACT" ? action.amount : 0;
 }
 
-/** Canonical strategy descriptor, used to derive the commitment hash. */
+/** Canonical strategy descriptor, used for documentation / commitment context. */
 export function strategyDescriptor(): Record<string, unknown> {
   return {
     name: STRATEGY_NAME,
     description: STRATEGY_DESCRIPTION,
+    params: [...config.strategyParams],
     rules: [
-      "turn>=18 and behind -> EXTRACT 10",
-      "opponent fortified this turn -> HOLD",
-      "lead>=10 and turn%3==0 -> FORTIFY",
-      "deficit>=10 -> EXTRACT 10",
-      "otherwise -> EXTRACT 5",
+      "selfBalance < params[1] -> FORTIFY",
+      "opponentBalance <= params[2] or params[3] == 1 -> HOLD",
+      "otherwise -> EXTRACT params[0]",
     ],
     constants: {
       extractMax: EXTRACT_MAX,
-      extractDefault: EXTRACT_DEFAULT,
       fortifyCost: FORTIFY_COST,
       fortifyBlock: FORTIFY_BLOCK,
       matchTurns: MATCH_TURNS,

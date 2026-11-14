@@ -17,6 +17,7 @@ import type { Request, Response } from "express";
 import { assertConfigForServing, config } from "./config";
 import { SIGNATURE_HEADER, signBody, verifySignature } from "./hmac";
 import { handleTurn } from "./turn";
+import { registerKurierVk } from "./proof";
 import type { PreflightRequest, TurnEnvelope } from "./types";
 
 export function createApp() {
@@ -111,5 +112,17 @@ export function startServer() {
   app.listen(config.port, () => {
     console.log(`[server] steal-the-vfy agent listening on :${config.port} (proofEnabled=${config.proofEnabled})`);
   });
+  // Register the circuit verification key with Kurier once, in the
+  // background — never blocks listen() and never throws. Without this,
+  // Kurier rejects every submit-proof job immediately (vkRegistered: true
+  // with no registered VK), which is exactly what happened to the
+  // Gatekeeper agent's first Kurier job on 2026-11-13.
+  if (config.kurierApiKey) {
+    registerKurierVk()
+      .then(({ vkHash }) => console.log(`[kurier] VK terdaftar, vkHash=${vkHash}`))
+      .catch((e: Error) => console.warn(`[kurier] registrasi VK gagal (submit proof akan gagal sampai VK terdaftar): ${e.message}`));
+  } else {
+    console.log("[kurier] registrasi VK dilewati: KURIER_API_KEY belum diset.");
+  }
   return app;
 }

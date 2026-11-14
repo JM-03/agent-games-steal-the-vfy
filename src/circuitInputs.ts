@@ -1,39 +1,33 @@
 // Circuit inputs for the vfy-policy Groth16 circuit.
 //
-// HONEST STATUS (verified 2026-11-13 by probing the public artifacts):
-// The official pages publish the circuit files and the vk_hash, but they do
-// NOT publish the circuit's input signal names, and the Steal starter prompt
-// on https://agentgames.zkverify.io/build is not present in the page text
-// that can be fetched (only the Gatekeeper prompt is).
+// STATUS — SOLVED 2026-11-14 (see CIRCUIT_NOTES.md):
+// The circuit takes 17 inputs: 9 scalars
+//   commitment, matchId, selfBalance, opponentBalance, action, amount,
+//   circuitVersion, turnNumber, salt
+// plus ONE array input, strategyParams[0..7] (the 8 previously "missing"
+// inputs are this array, not 8 separate names).
 //
-// What WAS verified, by probing circuits/vfy-policy.wasm with snarkjs
-// (see scripts/probe-circuit-inputs.cjs — it asks the circuit itself which
-// names are real inputs, one name at a time):
-//   - The circuit takes 17 inputs in total (snarkjs: "Only 0 out of 17").
-//   - Its verification key has nPublic = 9 (9 public signals).
-//   - These 9 input names ARE real circuit inputs (each accepted by the
-//     witness calculator):
-//         commitment, matchId, selfBalance, opponentBalance, action,
-//         amount, circuitVersion, turnNumber, salt
-//   - About 500 other candidate names were tested and rejected, including:
-//     turn, strategyCommitment, publicInputsHash, nonce, strategy,
-//     thresholds, fortify/exposed/spendable variants, snake_case variants.
-//   - The remaining 8 input names are UNKNOWN from every public source
-//     checked. They are most likely the private strategy parameters, but
-//     their exact names cannot be guessed safely — a wrong name makes the
-//     proof invalid, and an invalid proof is worse than no proof.
+// The params semantics + commitment formula were solved by three
+// independent participant repos that agree exactly (and were verified here
+// with snarkjs fullProve + local verification against the official VK):
+//   commitment = Poseidon(strategyParams[0..7], salt), params first, salt last.
+//   [0] = EXTRACT amount, valid 1..10
+//   [1] = FORTIFY threshold: FORTIFY when selfBalance < [1]
+//   [2] = HOLD threshold: HOLD when opponentBalance <= [2] OR [3] == 1
+//   [3] ∈ {0,1}; [4..7] must be exactly 0.
+//   Strict priority: FORTIFY → HOLD → EXTRACT with amount == [0] exactly.
 //
-// DO NOT invent the missing names. Fill them in ONLY from an authoritative
-// source: the Steal starter prompt on the /build page (open it in a browser
-// and copy the prompt), the circuit source, or zkVerify support / Discord.
-// Then:
-//   1. Add the names to MISSING_INPUT_NAMES below (move them to KNOWN_INPUTS).
-//   2. Map them to values in buildCircuitInputs().
-//   3. Set PROOF_ENABLED=true in your .env.
-//   4. Re-run the tests (npm test) and a practice turn before any scored round.
+// The decision the agent returns MUST follow that same list for the
+// configured params (see src/strategy.ts decideActionFromParams) —
+// otherwise fullProve throws the circuit assert and no proof is produced.
 import type { Action, TurnEnvelope } from "./types";
 import { actionAmountForHash } from "./strategy";
 import { ACTION_CODE, circuitVersionToNumber } from "./publicInputsHash";
+import { config } from "./config";
+import { validateStrategyParams } from "./strategyParams";
+import { saltToBigInt } from "./poseidon";
+
+export { validateStrategyParams };
 
 /** Input names verified against the real circuit (see header). */
 export const KNOWN_INPUTS = [
@@ -46,55 +40,48 @@ export const KNOWN_INPUTS = [
   "circuitVersion",
   "turnNumber",
   "salt",
+  "strategyParams",
 ] as const;
 
-/** The circuit takes 17 inputs; 9 are known, so 8 are still missing. */
+/** The circuit takes 17 inputs: 9 scalars + strategyParams[0..7]. */
 export const TOTAL_INPUTS = 17;
-export const MISSING_INPUT_COUNT = TOTAL_INPUTS - KNOWN_INPUTS.length; // 8
+
+export interface CircuitInputOptions {
+  /** Strategy params (default: config.strategyParams from STRATEGY_PARAMS). */
+  params?: number[];
+  /** Salt as "0x..." hex or decimal string (default: config.strategySalt). */
+  salt?: string;
+  /** Commitment hash override (default: envelope.strategyCommitment.hash). */
+  commitment?: string;
+}
 
 /**
- * Names of the 8 still-unknown inputs.
- * Fill these in from an authoritative source only — see the header.
- * Until this list is empty, generatePolicyProof() refuses to run.
- * The placeholders below stand for the 8 unknown private input names;
- * replace each one with its real name (and add its value in
- * buildCircuitInputs()) as soon as it is known.
- */
-export const MISSING_INPUT_NAMES: string[] = [
-  "UNKNOWN_PRIVATE_INPUT_1",
-  "UNKNOWN_PRIVATE_INPUT_2",
-  "UNKNOWN_PRIVATE_INPUT_3",
-  "UNKNOWN_PRIVATE_INPUT_4",
-  "UNKNOWN_PRIVATE_INPUT_5",
-  "UNKNOWN_PRIVATE_INPUT_6",
-  "UNKNOWN_PRIVATE_INPUT_7",
-  "UNKNOWN_PRIVATE_INPUT_8",
-];
-
-/**
- * Build the circuit input object for a turn.
- * Throws ProofInputsIncompleteError while any input name is still missing.
- * Values for the 9 known inputs follow the publicInputsHash field order and
- * the envelope: action is encoded HOLD=0 / FORTIFY=1 / EXTRACT=2 and
- * circuitVersion "v1" is encoded as 1.
+ * Build the 17 circuit inputs for a turn, as decimal strings (the format
+ * snarkjs fullProve accepts for bn128 field elements).
+ *
+ * @throws ProofInputsIncompleteError when the salt or the commitment is
+ *         missing, or when the params fail validation — the caller must
+ *         fail closed to HOLD (no proof), never guess.
  */
 export function buildCircuitInputs(
   envelope: TurnEnvelope,
   action: Action,
-  opts: { salt?: string } = {},
-): Record<string, string> {
-  // While any input name is still missing, no valid proof can be produced.
-  // When the missing names are found, add them to KNOWN_INPUTS above,
-  // add their values to the returned object, and clear MISSING_INPUT_NAMES.
-  if (MISSING_INPUT_NAMES.length > 0) {
+  opts: CircuitInputOptions = {},
+): Record<string, string | string[]> {
+  const params = validateStrategyParams(opts.params ?? config.strategyParams);
+  const saltRaw = opts.salt ?? config.strategySalt;
+  if (!saltRaw) {
     throw new ProofInputsIncompleteError(
-      `${MISSING_INPUT_COUNT} of ${TOTAL_INPUTS} circuit input names are still unknown. ` +
-        `Known: ${KNOWN_INPUTS.join(", ")}. ` +
-        `Fill in the missing names in src/circuitInputs.ts from the official Steal starter prompt or circuit source, then set PROOF_ENABLED=true.`,
+      "STRATEGY_SALT is not set. Run `npm run commitment` to generate a fresh salt " +
+        "and save it to .env.strategy (or set STRATEGY_SALT in the environment). " +
+        "Without the salt no valid proof can be produced.",
     );
   }
-  const commitment = envelope.strategyCommitment?.hash;
-  if (!commitment) throw new ProofInputsIncompleteError("Envelope has no strategyCommitment.hash.");
+  const salt = saltToBigInt(saltRaw).toString();
+  const commitment = opts.commitment ?? envelope.strategyCommitment?.hash;
+  if (!commitment) {
+    throw new ProofInputsIncompleteError("Envelope has no strategyCommitment.hash.");
+  }
   return {
     commitment: BigInt(commitment).toString(),
     matchId: BigInt("0x" + envelope.matchId.replace(/-/g, "")).toString(),
@@ -102,9 +89,10 @@ export function buildCircuitInputs(
     opponentBalance: BigInt(envelope.state.opponentBalance).toString(),
     action: ACTION_CODE[action.type].toString(),
     amount: actionAmountForHash(action).toString(),
-    circuitVersion: circuitVersionToNumber("v1").toString(),
+    circuitVersion: circuitVersionToNumber(config.circuitVersion).toString(),
     turnNumber: BigInt(envelope.turn).toString(),
-    salt: opts.salt ?? "0",
+    salt,
+    strategyParams: params.map((p) => p.toString()),
   };
 }
 
