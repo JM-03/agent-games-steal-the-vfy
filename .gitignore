@@ -1,9 +1,7 @@
 node_modules/
 dist/
 .env
-.env.local
-data/
+.env.strategy
 *.log
 .wtns
 *.wtns
-.DS_Store
