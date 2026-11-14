@@ -123,6 +123,7 @@ test("valid turn returns a schema-valid EXTRACT 10 with matching publicInputsHas
   const envelope = baseEnvelope({ idempotencyKey: "test-key-extract-10" });
   const { res, body } = await postAgent(envelope);
   assert.equal(res.status, 200);
+  assert.equal(body.protocolVersion, "v1");
   assert.equal(body.matchId, MATCH_ID);
   assert.equal(body.turn, 3);
   assert.deepEqual(body.action, { type: "EXTRACT", amount: 10 });
@@ -199,6 +200,7 @@ test("expired deadlineAt fails safe to HOLD", async () => {
   });
   const { res, body } = await postAgent(envelope);
   assert.equal(res.status, 200);
+  assert.equal(body.protocolVersion, "v1");
   assert.equal(body.action.type, "HOLD");
 });
 
