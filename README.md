@@ -43,6 +43,40 @@ the strategy mid-match, or reuse a proof.
 | The strategy itself | Nobody but the owner | Only the Poseidon commitment is ever published |
 | The agent cannot invent a move, reuse a proof, or act twice on one turn | Anyone | Circuit asserts + `publicInputsHash` bound to match/turn + deterministic idempotency key per turn |
 
+## What we check before acting
+
+zkVerify's own /build page puts it this way: *"A proof can verify
+perfectly and still authorize the wrong action. Your agent must confirm
+what was proven, not only whether verification succeeded."*
+("Verification is necessary, not sufficient.")
+
+Before acting, this agent checks what the proof proves — the same
+seven checks the /build page requires, mapped to how this repo enforces
+them:
+
+1. **The verification key matches the registered key** — proofs are
+   generated and self-verified against the official vfy-policy
+   verification key (`0x6c56…be047`), and the turn envelope's
+   commitment hash must match the committed strategy (`src/turn.ts`).
+2. **The circuit and proof system are the ones expected** — the
+   official `vfy-policy` circuit, Groth16/bn128, from the official
+   site (`circuits/`).
+3. **The public inputs prove the required threshold, recipient and
+   action** — the agent decides strictly by the circuit's decision
+   list (FORTIFY → HOLD → EXTRACT); a move outside the list is
+   unprovable.
+4. **The proof reference has not already been used** — a
+   deterministic idempotency key per `matchId:turn`; a replayed turn
+   returns the same response, never a new proof.
+5. **The verification reached a finalized state before approval** —
+   proofs are submitted to Kurier and polled until Finalized before
+   they count as on-chain evidence.
+6. **The task signature and timestamp are valid** — HMAC is verified
+   on the raw body before JSON is parsed; an expired deadline fails
+   closed to HOLD.
+7. **Every response is signed** — `x-agent-games-signature` on every
+   response.
+
 ## The refusal test — watch the agent try to cheat and fail
 
 ```bash
@@ -75,6 +109,16 @@ REFUSAL DEMO OK: 2/2 out-of-policy moves refused by the circuit, agent answered 
 
 Verification is the gate, not a badge: without the proof, the move does
 not happen.
+
+The same thesis won 1st place in the Dynatrace track at the Google
+Cloud Rapid Agent Hackathon 2026 (1,425 submissions): AutoSRE, an
+agent that physically cannot act without approval — "the refusal is
+the product" — with every approval and refusal in an append-only
+audit trail. This entry's audit trail is the Kurier Finalized
+receipt: every approved move leaves a checkable record on zkVerify
+mainnet. (A refused move produces no proof to submit, so no Kurier
+receipt exists for a refusal — the refusal demo's own output is the
+evidence.)
 
 ## Evidence
 
@@ -113,6 +157,11 @@ commitment and enforced by a Groth16 proof. It is the mirror image of the
 official example: instead of granting access when a proof shows a
 credential, this agent *acts* only when a proof shows the action is
 permitted by a committed policy.
+
+The same pattern keeps winning elsewhere: Mandate (sponsor prize,
+ETHOnline 2026), MARS (1st, ETHGlobal New York 2026), Petri
+(ETHOnline 2026 finalist), Identone (1st, cheqd Verifiable AI
+Hackathon 2025) — bounded authority with verification as the gate.
 
 The game is the hardest possible test of the pattern: an adversarial
 opponent, a public commitment, and a referee that cannot be bribed — if
