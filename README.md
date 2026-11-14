@@ -158,10 +158,14 @@ official example: instead of granting access when a proof shows a
 credential, this agent *acts* only when a proof shows the action is
 permitted by a committed policy.
 
-The same pattern keeps winning elsewhere: Mandate (sponsor prize,
-ETHOnline 2026), MARS (1st, ETHGlobal New York 2026), Petri
-(ETHOnline 2026 finalist), Identone (1st, cheqd Verifiable AI
-Hackathon 2025) — bounded authority with verification as the gate.
+The pattern is established: Mandate (sponsor prize, ETHOnline 2026),
+MARS (1st, ETHGlobal New York 2026), Petri (ETHOnline 2026 finalist)
+and Identone (1st, cheqd Verifiable AI Hackathon 2025) all bound an
+agent's authority and put verification in front of every action. What
+this entry adds is enforcement with real cryptography: Groth16 proofs
+verified on zkVerify mainnet, in a live adversarial match — every move
+carries a proof that it stayed inside the policy the agent committed
+to before the match.
 
 The game is the hardest possible test of the pattern: an adversarial
 opponent, a public commitment, and a referee that cannot be bribed — if
