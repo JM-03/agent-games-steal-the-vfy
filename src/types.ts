@@ -49,6 +49,7 @@ export interface PolicyProof {
 }
 
 export interface TurnResponse {
+  protocolVersion: string;
   matchId: string;
   turn: number;
   action: Action;

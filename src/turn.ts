@@ -17,14 +17,14 @@ import { createHash } from "node:crypto";
 import { config } from "./config";
 import { computePublicInputsHash } from "./publicInputsHash";
 import { decideAction, toStrategyContext } from "./strategy";
-import { generatePolicyProof, submitProofToKurier, pollKurierJob } from "./proof";
+import { generatePolicyProof, submitProofToKurier, pollKurierJob, type GeneratedProof } from "./proof";
 import { ProofInputsIncompleteError } from "./circuitInputs";
 import type { Action, PolicyProof, TurnEnvelope, TurnResponse } from "./types";
 
 export interface TurnOutcome {
   response: TurnResponse;
   /** What actually happened, for logs only — never sent to the platform. */
-  proofStatus: "proved-and-finalized" | "proved-not-finalized" | "no-proof" | "proof-error";
+  proofStatus: "proved-kurier-background" | "proved-not-finalized" | "no-proof" | "proof-error";
   reason: string;
 }
 
@@ -59,6 +59,7 @@ function holdResponse(envelope: TurnEnvelope, hash: string | undefined): TurnRes
   const policyProof: PolicyProof = { circuitVersion: config.circuitVersion };
   if (hash) policyProof.publicInputsHash = hash;
   return {
+    protocolVersion: "v1",
     matchId: envelope.matchId,
     turn: envelope.turn,
     action: { type: "HOLD" },
@@ -66,6 +67,37 @@ function holdResponse(envelope: TurnEnvelope, hash: string | undefined): TurnRes
     agentTimestamp: new Date().toISOString(),
     idempotencyKey: deriveIdempotencyKey(envelope),
   };
+}
+
+/**
+ * Submit a proof to Kurier in the background (fire-and-forget). The
+ * platform's turn window is ~30 s and it attests turns itself, so the
+ * response must never wait on a Kurier job reaching Finalized (the old
+ * code waited up to 20 s inside the handler — a timeout risk, report
+ * §7.4b). Logs the job id and final status; never throws, never blocks
+ * the response. Same pattern as the Gatekeeper agent's
+ * registerKurierVkInBackground().
+ */
+function submitToKurierInBackground(generated: GeneratedProof, matchId: string, turn: number): void {
+  if (!config.kurierApiKey) return;
+  void submitProofToKurier(generated)
+    .then((job) => {
+      console.log(
+        `[kurier] turn proof submitted: match=${matchId.slice(0, 8)} turn=${turn} jobId=${job.jobId} status=${job.status}`,
+      );
+      return pollKurierJob(job, { timeoutMs: 120_000 });
+    })
+    .then((finalized) => {
+      console.log(
+        `[kurier] job ${finalized.jobId} final status: ${finalized.status}` +
+          (finalized.proofReference ? ` proofReference=${finalized.proofReference}` : ""),
+      );
+    })
+    .catch((e: Error) => {
+      console.warn(
+        `[kurier] background submit failed (match=${matchId.slice(0, 8)} turn=${turn}): ${e.message}`,
+      );
+    });
 }
 
 function validateEnvelope(envelope: TurnEnvelope): string | null {
@@ -159,6 +191,7 @@ export async function handleTurn(envelope: TurnEnvelope): Promise<TurnOutcome> {
   }
 
   const baseResponse = (policyProof: PolicyProof): TurnResponse => ({
+    protocolVersion: "v1",
     matchId: envelope.matchId,
     turn: envelope.turn,
     // action.amount is included ONLY for EXTRACT (schema rule).
@@ -176,26 +209,14 @@ export async function handleTurn(envelope: TurnEnvelope): Promise<TurnOutcome> {
     });
   }
 
-  // Proof path: generate locally, submit to Kurier, wait for Finalized.
+  // Proof path: generate locally and self-verify, then respond
+  // IMMEDIATELY. Kurier submission runs in the background — the platform
+  // attests turns itself and the turn window is ~30 s, so the response
+  // must never wait up to 20 s for a Finalized job (report §7.4b).
   try {
     const generated = await generatePolicyProof(envelope, action);
-    let proofReference: string | undefined;
-    if (config.kurierApiKey) {
-      const job = await submitProofToKurier(generated);
-      const finalized = await pollKurierJob(job, { timeoutMs: 20_000 });
-      proofReference = finalized.proofReference ?? finalized.jobId;
-      return finish({
-        response: baseResponse({
-          circuitVersion: config.circuitVersion,
-          proof: generated.proof,
-          publicSignals: generated.publicSignals,
-          proofReference,
-          publicInputsHash: hash,
-        }),
-        proofStatus: "proved-and-finalized",
-        reason: `proof generated and Finalized on Kurier (job ${finalized.jobId})`,
-      });
-    }
+    const kurierBackground = !!config.kurierApiKey;
+    submitToKurierInBackground(generated, envelope.matchId, envelope.turn);
     return finish({
       response: baseResponse({
         circuitVersion: config.circuitVersion,
@@ -203,8 +224,10 @@ export async function handleTurn(envelope: TurnEnvelope): Promise<TurnOutcome> {
         publicSignals: generated.publicSignals,
         publicInputsHash: hash,
       }),
-      proofStatus: "proved-not-finalized",
-      reason: "proof generated locally but KURIER_API_KEY is empty, so it was not submitted for Finalized verification",
+      proofStatus: kurierBackground ? "proved-kurier-background" : "proved-not-finalized",
+      reason: kurierBackground
+        ? "proof generated and self-verified; Kurier submission running in background"
+        : "proof generated locally but KURIER_API_KEY is empty, so it was not submitted for Finalized verification",
     });
   } catch (e) {
     const message = e instanceof ProofInputsIncompleteError ? e.message : (e as Error).message;

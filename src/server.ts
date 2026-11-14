@@ -87,6 +87,7 @@ export function createApp() {
       // handleTurn is designed not to throw; this is a last-resort guard.
       console.error("[turn] unexpected error:", (e as Error).message);
       return finish(200, {
+        protocolVersion: "v1",
         matchId: (body as Record<string, unknown>).matchId ?? "",
         turn: (body as Record<string, unknown>).turn ?? 0,
         action: { type: "HOLD" },
