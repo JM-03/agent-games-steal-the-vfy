@@ -54,28 +54,15 @@ Before acting, this agent checks what the proof proves — the same
 seven checks the /build page requires, mapped to how this repo enforces
 them:
 
-1. **The verification key matches the registered key** — proofs are
-   generated and self-verified against the official vfy-policy
-   verification key (`0x6c56…be047`), and the turn envelope's
-   commitment hash must match the committed strategy (`src/turn.ts`).
-2. **The circuit and proof system are the ones expected** — the
-   official `vfy-policy` circuit, Groth16/bn128, from the official
-   site (`circuits/`).
-3. **The public inputs prove the required threshold, recipient and
-   action** — the agent decides strictly by the circuit's decision
-   list (FORTIFY → HOLD → EXTRACT); a move outside the list is
-   unprovable.
-4. **The proof reference has not already been used** — a
-   deterministic idempotency key per `matchId:turn`; a replayed turn
-   returns the same response, never a new proof.
-5. **The verification reached a finalized state before approval** —
-   proofs are submitted to Kurier and polled until Finalized before
-   they count as on-chain evidence.
-6. **The task signature and timestamp are valid** — HMAC is verified
-   on the raw body before JSON is parsed; an expired deadline fails
-   closed to HOLD.
-7. **Every response is signed** — `x-agent-games-signature` on every
-   response.
+| # | Check | Enforced by |
+|---|---|---|
+| 1 | Verification key matches the registered key | Proofs generated + self-verified vs official vfy-policy VK (`0x6c56…be047`); envelope commitment must match (`src/turn.ts`) |
+| 2 | Circuit and proof system are the ones expected | Official `vfy-policy` circuit, Groth16/bn128 (`circuits/`) |
+| 3 | Public inputs prove the required threshold, recipient and action | Strict decision list FORTIFY → HOLD → EXTRACT; a move outside the list is unprovable |
+| 4 | Proof reference not already used | Deterministic idempotency key per `matchId:turn`; a replay returns the same response, never a new proof |
+| 5 | Verification reached a finalized state before approval | Proofs submitted to Kurier and polled until Finalized before they count as on-chain evidence |
+| 6 | Task signature and timestamp valid | HMAC verified on the raw body before JSON is parsed; an expired deadline fails closed to HOLD |
+| 7 | Every response signed | `x-agent-games-signature` on every response |
 
 ## The refusal test — watch the agent try to cheat and fail
 
@@ -110,15 +97,12 @@ REFUSAL DEMO OK: 2/2 out-of-policy moves refused by the circuit, agent answered 
 Verification is the gate, not a badge: without the proof, the move does
 not happen.
 
-The same thesis won 1st place in the Dynatrace track at the Google
-Cloud Rapid Agent Hackathon 2026 (1,425 submissions): AutoSRE, an
-agent that physically cannot act without approval — "the refusal is
-the product" — with every approval and refusal in an append-only
-audit trail. This entry's audit trail is the Kurier Finalized
-receipt: every approved move leaves a checkable record on zkVerify
-mainnet. (A refused move produces no proof to submit, so no Kurier
-receipt exists for a refusal — the refusal demo's own output is the
-evidence.)
+AutoSRE won 1st place in the Dynatrace track at the Google Cloud
+Rapid Agent Hackathon 2026 (1,425 submissions) on the same thesis —
+"the refusal is the product." This entry's audit trail is the Kurier
+Finalized receipt: every approved move leaves a checkable record on
+zkVerify mainnet. (A refused move produces no proof, so no receipt
+exists for a refusal — the demo output is the evidence.)
 
 ## Evidence
 
