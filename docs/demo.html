@@ -42,16 +42,94 @@ does not control (see "On-chain evidence" below).</p>
 <strong>Live endpoint:</strong> <code>https://agent-games-steal-the-vfy-production.up.railway.app/agent</code><br>
 <strong>Write-up:</strong> <a href="https://github.com/JM-03/agent-games-steal-the-vfy/blob/main/WRITEUP.md">WRITEUP.md — How to prove an agent stayed inside its policy</a></p>
 
+<h2>Try to rob it — verify a real proof in 3 commands</h2>
+<p>Don't take this page's word for it. One real proof from the demo
+match is committed in the repo — verify it with <strong>zero repo
+code</strong>, only snarkjs:</p>
+<pre>git clone https://github.com/JM-03/agent-games-steal-the-vfy.git
+cd agent-games-steal-the-vfy
+npm run verify:proof</pre>
+<p>Expected output: <code>[INFO] snarkJS: OK!</code> — the turn-1 proof
+(EXTRACT 10, commitment
+<code>0x0b9f…1cb39</code>) verifies against the official verification key
+exported from <code>circuits/vfy-policy_final.zkey</code>. Files:
+<code>evidence/proof-turn-1/proof.json</code>,
+<code>public.json</code>, <code>verification_key.json</code>.</p>
+<p><strong>Our server alone can never produce VERIFIED — only
+Kurier / zkVerify mainnet can.</strong> Local self-verification is only
+the first gate; a proof that fails it is never sent. The check that
+counts happens on mainnet, by a verifier the agent does not control —
+and the files above are the raw material any second, independent
+verifier checks.</p>
+
+<h2>Treasury guard — the same pattern, real money framing</h2>
+<p>Bayangkan ini treasury, bukan game — polanya sama, uangnya beneran.
+The treasury policy is the defensive strategy
+<code>[5,50,20,0,0,0,0,0]</code> under its own commitment
+<code>0x1b63…a2a24</code>: spend capped at 5 VFY per move, a reserve
+floor of 50 (fortify instead of spending below it), a counterparty floor
+of 20 (hold below it). Click one — <strong>the refused one is shown
+first on purpose</strong>:</p>
+<p>
+<button onclick="showTreasury(1)" id="tbtn1">1 — Spend 11 (over cap) → REFUSED</button>
+<button onclick="showTreasury(2)" id="tbtn2">2 — Spend 5 to allowlist → SAFE + proof</button>
+<button onclick="showTreasury(3)" id="tbtn3">3 — Spend 5 outside allowlist → REJECTED</button>
+</p>
+<div id="treasury1">
+<p><strong>Example 1 — Spend 11 VFY (committed cap is 5). Verdict:
+<span style="color:#b42318;font-weight:bold">REFUSED</span>.</strong></p>
+<pre>EXAMPLE 1 — spend 11 VFY (committed cap is 5) ...
+  VERDICT: REFUSED — Error: Assert Failed. Error in template VfyPolicyProof_154 line: 149
+  What the circuit said: no proof exists for a spend over the committed cap.
+  -&gt; The spend does not happen. Same refusal as `npm run demo:refusal` attempt 1, applied to the treasury cap.</pre>
+</div>
+<div id="treasury2" style="display:none">
+<p><strong>Example 2 — Spend 5 VFY to allowlisted
+<code>0x1111…1111</code>. Verdict:
+<span class="ok">SAFE + real proof</span>.</strong></p>
+<pre>EXAMPLE 2 — spend 5 VFY to allowlisted 0x1111111111111111111111111111111111111111 ...
+  VERDICT: SAFE — proof generated + locally self-verified.
+  What the circuit said: EXTRACT 5 == committed cap 5, balances clear both floors — allowed.
+  Proof exported to evidence/treasury-spend-5/ (verify with: npm run verify:treasury)</pre>
+<p>Verify that proof yourself: <code>npm run verify:treasury</code>
+(expected: <code>[INFO] snarkJS: OK!</code>).</p>
+</div>
+<div id="treasury3" style="display:none">
+<p><strong>Example 3 — Spend 5 VFY to
+<code>0x9999…9999</code> (not on the allowlist). Verdict:
+<span style="color:#b42318;font-weight:bold">REJECTED</span>.</strong></p>
+<pre>EXAMPLE 3 — spend 5 VFY to 0x9999999999999999999999999999999999999999 (not on the allowlist) ...
+  VERDICT: REJECTED by the allowlist (guard layer) — the circuit was never asked.
+  What the guard said: recipient is not on the allowlist, so no spend is attempted and no proof is requested.
+  -&gt; The spend does not happen. (The circuit itself does not know addresses — see "What this does not prove" in the README.)</pre>
+</div>
+<p><em>Precomputed demo — transcripts recorded 16 Nov 2026 from
+<code>npm run demo:treasury</code> (run it yourself for the live output).
+The verdicts are not live compute: this page shows what the script
+printed. The allowlist check is a guard-layer check, not a circuit
+check — the circuit knows balances and caps, not addresses.</em></p>
+<script>
+function showTreasury(n) {
+  for (var i = 1; i <= 3; i++) {
+    document.getElementById('treasury' + i).style.display = (i === n) ? 'block' : 'none';
+  }
+}
+</script>
+
 <h2>How to read this page</h2>
 <p>This page is a transcript of real local runs of the repo's demo scripts,
-recorded <strong>15 Nov 2026</strong>. What is real: the turn handler
+recorded <strong>15–16 Nov 2026</strong> (main + defensive matches on
+15 Nov; refusal, treasury and reveal transcripts on 16 Nov). What is
+real: the turn handler
 (<code>src/turn.ts</code>), the Groth16 proofs (snarkjs + official
 <code>vfy-policy</code> circuit), and the local self-verification of every
 proof. What is simulated: the opponent (a fixed script) and the balance
 resolver (documented rules in the repo — FORTIFY costs 2 VFY and blocks up
 to 6 on the next turn; EXTRACT steals up to the requested amount; both
 sides' gains are computed from start-of-turn balances and applied
-together). The match is a local simulation, not a tournament game — the
+together). The treasury examples are precomputed transcripts of
+<code>npm run demo:treasury</code> — the verdicts are what the script
+printed, labelled as such. The match is a local simulation, not a tournament game — the
 Steal tournament entries are locked, so this demo + proofs are the entry.</p>
 <p>Proof timings vary run to run; the moves, balances and final scores are
 deterministic. Reproduce it yourself: <code>npm install &amp;&amp; npm run
@@ -66,34 +144,51 @@ build &amp;&amp; npm run demo</code> (see the repo README).</p>
   <li><strong>Result</strong> — only a proven move is answered; anything else fails closed to HOLD.</li>
 </ol>
 
+<h2>Try it — seven moves, seven exact answers</h2>
+<p>Every row below is one command from the repo, with the exact result
+you should see. No surprises, no paraphrase — if your run prints
+something else, that is a bug, not a different opinion.</p>
+<table>
+  <thead><tr><th>#</th><th>Command</th><th>What to look for</th><th>Exact expected result</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>npm run demo</code></td><td>Turn 1</td><td>us EXTRACT 10, proof proved, balances 100→105 / 100→95; totals 20/20, final 168–28</td></tr>
+    <tr><td>2</td><td><code>npm run demo:refusal</code></td><td>Attempt 1</td><td>CIRCUIT REFUSED — Assert Failed, template VfyPolicyProof_154 line 149 (EXTRACT 11 over cap 10)</td></tr>
+    <tr><td>3</td><td><code>npm run demo:refusal</code></td><td>Attempt 2</td><td>CIRCUIT REFUSED — Assert Failed, template line 140 (EXTRACT 10 when strategy says HOLD)</td></tr>
+    <tr><td>4</td><td><code>npm run demo:refusal</code></td><td>Attempt 3</td><td>turn 1 proof vs turn 2 signals: INVALID — replay rejected</td></tr>
+    <tr><td>5</td><td><code>npm run demo:defensive</code></td><td>Scenario A, turn 12</td><td>us FORTIFY (balance 45 &lt; 50), proof proved, balances 45→38</td></tr>
+    <tr><td>6</td><td><code>npm run demo:defensive</code></td><td>Scenario B, turn 17</td><td>us HOLD (opponent 20 ≤ 20), proof proved, balances 180→180 / 20→20</td></tr>
+    <tr><td>7</td><td><code>npm run attack</code></td><td>Final line</td><td>ATTACK SCRIPT OK: 5/5 attacks failed (tampered commitment, replay, strategy swap, forged proof, unsigned envelope)</td></tr>
+  </tbody>
+</table>
+
 <h2>Demo match — 20 turns, real proofs</h2>
 <p>Params <code>[10,0,0,0,0,0,0,0]</code> (always EXTRACT 10) —
 commitment
 <code>0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39</code>.
 Recorded 15 Nov 2026 from <code>npm run demo</code>.</p>
 <table>
-  <thead><tr><th>Turn</th><th>Our move</th><th>Opponent</th><th>Us</th><th>Opp</th><th>Proof</th></tr></thead>
+  <thead><tr><th>Turn</th><th>Our move</th><th>Opponent</th><th>Us</th><th>Opp</th><th>Proof</th><th>What the circuit said</th></tr></thead>
   <tbody>
-    <tr><td>1</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">105</td><td class="num">95</td><td class="ok">✓ proved</td></tr>
-    <tr><td>2</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">110</td><td class="num">90</td><td class="ok">✓ proved</td></tr>
-    <tr><td>3</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">115</td><td class="num">85</td><td class="ok">✓ proved</td></tr>
-    <tr><td>4</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">120</td><td class="num">80</td><td class="ok">✓ proved</td></tr>
-    <tr><td>5</td><td>EXTRACT 10</td><td>FORTIFY</td><td class="num">130</td><td class="num">68</td><td class="ok">✓ proved</td></tr>
-    <tr><td>6</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">129</td><td class="num">69</td><td class="ok">✓ proved</td></tr>
-    <tr><td>7</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">134</td><td class="num">64</td><td class="ok">✓ proved</td></tr>
-    <tr><td>8</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">139</td><td class="num">59</td><td class="ok">✓ proved</td></tr>
-    <tr><td>9</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">144</td><td class="num">54</td><td class="ok">✓ proved</td></tr>
-    <tr><td>10</td><td>EXTRACT 10</td><td>FORTIFY</td><td class="num">154</td><td class="num">42</td><td class="ok">✓ proved</td></tr>
-    <tr><td>11</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">153</td><td class="num">43</td><td class="ok">✓ proved</td></tr>
-    <tr><td>12</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">158</td><td class="num">38</td><td class="ok">✓ proved</td></tr>
-    <tr><td>13</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">163</td><td class="num">33</td><td class="ok">✓ proved</td></tr>
-    <tr><td>14</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
-    <tr><td>15</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
-    <tr><td>16</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
-    <tr><td>17</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
-    <tr><td>18</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
-    <tr><td>19</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
-    <tr><td>20</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
+    <tr><td>1</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">105</td><td class="num">95</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>2</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">110</td><td class="num">90</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>3</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">115</td><td class="num">85</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>4</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">120</td><td class="num">80</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>5</td><td>EXTRACT 10</td><td>FORTIFY</td><td class="num">130</td><td class="num">68</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>6</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">129</td><td class="num">69</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>7</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">134</td><td class="num">64</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>8</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">139</td><td class="num">59</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>9</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">144</td><td class="num">54</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>10</td><td>EXTRACT 10</td><td>FORTIFY</td><td class="num">154</td><td class="num">42</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>11</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">153</td><td class="num">43</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>12</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">158</td><td class="num">38</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>13</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">163</td><td class="num">33</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>14</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>15</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>16</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>17</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>18</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>19</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
+    <tr><td>20</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td><td>✓ allowed — EXTRACT 10 = cap</td></tr>
   </tbody>
 </table>
 <p><strong>Totals: 20/20 turns proved + locally verified, 15,657 ms total
@@ -129,7 +224,7 @@ defensive branches, so the demo plays two matches under one commitment
 instead of faking it in one.</p>
 
 <h2>Refusal demo — watch the agent try to cheat and fail</h2>
-<p>Recorded 15 Nov 2026 from <code>npm run demo:refusal</code>. Two
+<p>Recorded 16 Nov 2026 from <code>npm run demo:refusal</code>. Three
 out-of-policy moves attempted against the real committed strategy and the
 real circuit:</p>
 <pre>Refusal demo — Steal the VFY (the verification gate saying NO)
@@ -145,6 +240,16 @@ ATTEMPT 2: prove EXTRACT 10 when opponent balance is 0 (strategy says HOLD) ...
   CIRCUIT REFUSED: Error: Assert Failed. Error in template VfyPolicyProof_154 line: 140
   -&gt; No proof exists for this move. Nothing to send, nothing to verify.
 
+ATTEMPT 3: replay turn 1's valid proof as turn 2's proof ...
+  turn 1 proof vs turn 1 signals: valid
+  turn 2 proof vs turn 2 signals: valid
+  turn 1 proof vs turn 2 signals: INVALID — replay rejected
+  -&gt; Public signals bind matchId + turnNumber, so a proof made for turn N does not verify for turn M.
+
+RETRY: same turn 1 envelope sent twice (platform retry) ...
+  identical response: yes  | idempotencyKey: 8f1fe0e2-9b28-5a2f-b58a-cfa570da0930
+  -&gt; A retry returns the cached response. The agent never proves the same turn twice.
+
 AGENT ANSWER for that same turn (turn 2, opponent balance 0):
   action: HOLD  | proof: yes (valid, self-verified)  | proofStatus: proved-not-finalized
   -&gt; The agent never sends the refused move. It answers the in-policy action (HOLD) and proves that one instead.
@@ -153,21 +258,42 @@ FAIL-CLOSED: turn envelope with a tampered commitment hash ...
   action: HOLD  | proof: no  | proofStatus: no-proof
   -&gt; The agent answers HOLD with no proof instead of guessing or sending an unproven move.
 
-REFUSAL DEMO OK: 2/2 out-of-policy moves refused by the circuit, agent answered HOLD in both fail-closed cases.
+REFUSAL DEMO OK: 3/3 out-of-policy moves refused by the circuit (over-cap, wrong-branch, replay), agent answered HOLD in both fail-closed cases.
 A wrong move cannot be proven at all — and without a proof, the move does not happen.</pre>
 <p>Verification is the gate, not a badge: without the proof, the move
 does not happen. A refused move produces no proof, so no Kurier receipt
 exists for a refusal — the demo output above is the evidence.</p>
 
+<h2>Reveal — commit → act → reveal</h2>
+<p>After the match, the owner opens the DEMO strategy. The defensive
+commitment <code>0x1b63…a2a24</code> was published before the defensive
+matches; its params and salt are revealed here, so anyone can recompute
+the commitment and confirm the strategy was fixed in advance:</p>
+<pre>npm run reveal:demo
+
+Reveal — demo strategy (defensive commitment ONLY)
+params:     [5,50,20,0,0,0,0,0]
+salt:       0x1569514d09c0dddef31b99d04671016330ef290b81f69808be10b873cca5fc
+commitment: 0x1b633a5a1e59fadd82344fc383f6aef95d6b043d46f4fe87235bfc99d88a2a24
+
+Recomputing commitment = Poseidon(params, salt) ...
+recomputed: 0x1b633a5a1e59fadd82344fc383f6aef95d6b043d46f4fe87235bfc99d88a2a24
+MATCH — the revealed strategy is exactly the one committed to before the match.</pre>
+<p><strong>Only the DEMO commitment is ever revealed.</strong> The main
+commitment (<code>0x0b9f…1cb39</code>) and its salt stay secret — there
+is no ceremony in which the main salt is revealed. A commitment nobody
+can ever check is a claim; a commitment that is revealed and recomputed
+is evidence.</p>
+
 <h2>On-chain evidence (Kurier)</h2>
-<div class="note"><strong>Status 15 Nov 2026: pending.</strong> No Steal
-proof has been submitted to Kurier yet — that step needs the Kurier API
-key, which is set on the live service, not in the local demo runs. Once a
-demo is run with the key, one proof is submitted and polled until
-Finalized, and its job id will be listed here and in the submission's
-Proof Reference. The Gatekeeper agent (same Kurier setup, same key) has
-already had proofs Finalized — the pipeline itself is proven end to
-end.</div>
+<div class="note"><strong>Status 16 Nov 2026: pending.</strong> No Steal
+proof has been submitted to Kurier yet — that step needs a demo run with
+the Kurier API key set, and the key is not yet set on the Steal service
+(that is part of the env-var session). Once a demo is run with the key,
+one proof is submitted and polled until Finalized, and its job id will
+be listed here and in the submission's Proof Reference. The Gatekeeper
+agent (same Kurier setup, same key) has already had proofs Finalized —
+the pipeline itself is proven end to end.</div>
 <p>Circuit vk_hash:
 <code>0x6c56509f1c56fd1fd4e9737f906d2220f4b95f1d507f1adf6899085bd74be047</code>
 (official <code>vfy-policy</code> circuit, Groth16/bn128, 9 public
@@ -181,12 +307,16 @@ npm run build
 npm run demo           # 20-turn match, real proofs
 npm run demo:defensive # FORTIFY + HOLD live (second commitment)
 npm run demo:refusal   # watch an illegal move fail
-npm test               # 19/19 tests</pre>
+npm run demo:treasury  # treasury guard — 3 examples
+npm run attack         # five attacks, all must fail
+npm run verify:proof   # verify one real proof, zero repo code
+npm run reveal:demo    # reveal the DEMO strategy, recompute its commitment
+npm test               # 24/24 tests</pre>
 
 <footer>
   <p>Steal the VFY — Wildcard entry for zkVerify Agent Games. Built by Elgi
   (@jmartil1, GitHub JM-03) with his AI assistant jink. Transcripts on
-  this page recorded 15 Nov 2026 from the repo's demo scripts; proof
+  this page recorded 15–16 Nov 2026 from the repo's demo scripts; proof
   timings vary per run. The Steal tournament entries are locked, so this
   is a Wildcard demo, not a tournament entry. Honest limits are listed in
   the <a href="https://github.com/JM-03/agent-games-steal-the-vfy">README</a>.</p>
