@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .env.strategy
+.env.strategy-defensive
 *.log
 .wtns
 *.wtns

@@ -23,6 +23,7 @@
     "build": "tsc -p tsconfig.json",
     "commitment": "node scripts/commitment.cjs",
     "demo": "node scripts/demo-match.cjs",
+    "demo:defensive": "node scripts/demo-match-defensive.cjs",
     "demo:refusal": "node scripts/demo-refusal.cjs",
     "dev": "tsx watch src/index.ts",
     "probe": "node scripts/probe-circuit-inputs.cjs",
