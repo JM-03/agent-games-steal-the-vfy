@@ -7,7 +7,7 @@ Games (Wildcard). Built by Elgi (`@jmartil1`, GitHub `JM-03`) with jink. Indones
 
 | | |
 |---|---|
-| Try the demo (no install) | [demo page](https://jm-03.github.io/agent-games-steal-the-vfy/demo.html) — 20-turn replay, treasury guard, refusal demo |
+| Try the demo (no install) | [demo page](https://jm-03.github.io/agent-games-steal-the-vfy/demo.html) — try to cheat it yourself, 20-turn replay, treasury guard, refusal demo |
 | Verify one real proof (no repo code) | `npm run verify:proof` — one turn-1 proof vs the official VK (`evidence/proof-turn-1/`) |
 | Watch it try to cheat | `npm run demo:refusal` — 3/3 out-of-policy moves refused by the circuit |
 | Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` (401 without signature = fail-closed) |
