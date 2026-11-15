@@ -10,14 +10,18 @@
 //      caps at 10) — the circuit REFUSES to produce a proof.
 //   2. An out-of-policy move on a HOLD turn (EXTRACT 10 when the opponent
 //      balance is 0, where the strategy says HOLD) — the circuit REFUSES.
-//   3. What the agent actually answers for that same turn: HOLD, with a
+//   3. A replay attack: turn 1's valid proof, presented as turn 2's
+//      proof — verification FAILS (public signals bind matchId +
+//      turnNumber), and a platform retry of the same turn returns the
+//      cached response, never a new proof.
+//   4. What the agent actually answers for that same turn: HOLD, with a
 //      valid proof for the in-policy action — it never sends the refused
 //      move.
-//   4. Fail-closed: a turn envelope with a tampered commitment hash —
+//   5. Fail-closed: a turn envelope with a tampered commitment hash —
 //      the agent answers HOLD with NO proof instead of guessing.
 //
 // Run: npm run demo:refusal
-// Exit code 0 only if BOTH refusal attempts failed AND the agent answered
+// Exit code 0 only if ALL THREE refusal attempts failed AND the agent answered
 // HOLD in both fail-closed cases. Any other outcome exits non-zero.
 //
 // SECURITY: the strategy salt is never printed. The commitment is public
@@ -40,7 +44,8 @@ for (const file of [".env", ".env.strategy"]) {
 // Keep Kurier OUT of this demo (no proof is submitted anywhere).
 if (process.env.KURIER_API_KEY) delete process.env.KURIER_API_KEY;
 
-const { generatePolicyProof } = require(path.join(root, "dist", "proof.js"));
+const snarkjs = require("snarkjs");
+const { generatePolicyProof, exportVerificationKey } = require(path.join(root, "dist", "proof.js"));
 const { handleTurn } = require(path.join(root, "dist", "turn.js"));
 
 const MATCH_ID = "12345678-1234-1234-1234-123456789abe";
@@ -107,6 +112,43 @@ async function main() {
   }
   console.log("");
 
+  // --- Attempt 3: replay attack — turn 1's valid proof, reused as turn 2's.
+  console.log("ATTEMPT 3: replay turn 1's valid proof as turn 2's proof ...");
+  let replayBlocked = false;
+  let retryIdentical = false;
+  try {
+    const proof1 = await generatePolicyProof(envelope(1, 100, 100, commitment), { type: "EXTRACT", amount: 10 });
+    const proof2 = await generatePolicyProof(envelope(2, 100, 100, commitment), { type: "EXTRACT", amount: 10 });
+    const vk = await exportVerificationKey();
+    // Sanity: each proof verifies against its OWN public signals.
+    const own1 = await snarkjs.groth16.verify(vk, proof1.publicSignals, proof1.proof);
+    const own2 = await snarkjs.groth16.verify(vk, proof2.publicSignals, proof2.proof);
+    // The attack: turn 1's proof checked against turn 2's public signals.
+    const replay = await snarkjs.groth16.verify(vk, proof2.publicSignals, proof1.proof);
+    console.log(`  turn 1 proof vs turn 1 signals: ${own1 ? "valid" : "INVALID (unexpected)"}`);
+    console.log(`  turn 2 proof vs turn 2 signals: ${own2 ? "valid" : "INVALID (unexpected)"}`);
+    console.log(`  turn 1 proof vs turn 2 signals: ${replay ? "VALID — replay SUCCEEDED (must never happen)" : "INVALID — replay rejected"}`);
+    if (own1 && own2 && !replay) {
+      replayBlocked = true;
+      console.log("  -> Public signals bind matchId + turnNumber, so a proof made for turn N does not verify for turn M.");
+    }
+  } catch (e) {
+    console.log(`  replay check errored (treated as blocked, but unexpected): ${e.message}`);
+    replayBlocked = false;
+  }
+  console.log("");
+
+  // --- Same turn, sent twice (platform retry): identical response, never a new proof.
+  console.log("RETRY: same turn 1 envelope sent twice (platform retry) ...");
+  const first = await handleTurn(envelope(1, 100, 100, commitment));
+  const second = await handleTurn(envelope(1, 100, 100, commitment));
+  retryIdentical = JSON.stringify(first.response) === JSON.stringify(second.response);
+  console.log(`  identical response: ${retryIdentical ? "yes" : "NO (must never happen)"}  | idempotencyKey: ${first.response.idempotencyKey}`);
+  console.log(retryIdentical
+    ? "  -> A retry returns the cached response. The agent never proves the same turn twice."
+    : "  -> !!! Retry produced a different response. DEMO FAILED.");
+  console.log("");
+
   // --- What the agent actually answers for that same turn (turn 2, opp 0).
   console.log("AGENT ANSWER for that same turn (turn 2, opponent balance 0):");
   const outcome = await handleTurn(envelope(2, 100, 0, commitment));
@@ -135,12 +177,12 @@ async function main() {
     : "  -> !!! Agent did NOT fail closed. DEMO FAILED.");
   console.log("");
 
-  if (refused === 2 && agentHeld && failedClosed) {
-    console.log("REFUSAL DEMO OK: 2/2 out-of-policy moves refused by the circuit, agent answered HOLD in both fail-closed cases.");
+  if (refused === 2 && replayBlocked && retryIdentical && agentHeld && failedClosed) {
+    console.log("REFUSAL DEMO OK: 3/3 out-of-policy moves refused by the circuit (over-cap, wrong-branch, replay), agent answered HOLD in both fail-closed cases.");
     console.log("A wrong move cannot be proven at all — and without a proof, the move does not happen.");
     process.exit(0);
   }
-  console.error(`REFUSAL DEMO FAILED: refused=${refused}/2, agentHeld=${agentHeld}, failedClosed=${failedClosed}.`);
+  console.error(`REFUSAL DEMO FAILED: refused=${refused}/2, replayBlocked=${replayBlocked}, retryIdentical=${retryIdentical}, agentHeld=${agentHeld}, failedClosed=${failedClosed}.`);
   process.exit(1);
 }
 
