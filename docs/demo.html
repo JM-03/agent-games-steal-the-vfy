@@ -34,7 +34,9 @@ decision list, generates a Groth16 proof against the official
 <code>vfy-policy</code> circuit that the move is permitted by the committed
 strategy, self-verifies it locally, and only then answers. A wrong move
 cannot be proven at all — the circuit refuses, and the agent fails closed
-to HOLD.</p>
+to HOLD. Local self-verification is only the first gate: the proof that
+counts is the one verified on zkVerify mainnet, by a verifier the agent
+does not control (see "On-chain evidence" below).</p>
 
 <p><strong>Repo:</strong> <a href="https://github.com/JM-03/agent-games-steal-the-vfy">github.com/JM-03/agent-games-steal-the-vfy</a><br>
 <strong>Live endpoint:</strong> <code>https://agent-games-steal-the-vfy-production.up.railway.app/agent</code><br>
