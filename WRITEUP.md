@@ -64,8 +64,11 @@ no platform needed):
 |---|---|
 | Demo match, 20 turns | 20/20 proved + locally verified, final 168–28 |
 | Defensive demo, 2 matches | 40/40 proved + locally verified (FORTIFY x9, HOLD x4) |
-| Refusal demo | 2/2 out-of-policy moves refused by the circuit |
-| Test suite | 19/19 pass |
+| Refusal demo | 3/3 out-of-policy moves refused by the circuit |
+| Treasury guard demo | 3/3 behaved as committed (1 refused, 1 proved, 1 allowlist-rejected) |
+| Attack script | 5/5 attacks blocked |
+| Independent proof check | One real turn-1 proof verifies with zero repo code (`npm run verify:proof`) |
+| Test suite | 24/24 pass |
 
 Every move carries a 256-byte proof. Verifying one directly on Ethereum
 would cost about 272,000 gas for 9 public inputs (Horizen Labs' formula:
@@ -74,19 +77,35 @@ verification cost by up to 90% versus Ethereum. Trusting the agent's own
 logs costs $0 and proves nothing; verifying each move on zkVerify makes
 it checkable by anyone, permanently.
 
+## Reveal after the match
+
+The pattern has a third step, borrowed from commit-then-reveal games:
+after the match, the owner opens the DEMO strategy — its params and its
+salt — and anyone recomputes the commitment (`npm run reveal:demo`) to
+confirm the strategy was fixed before the match and never changed.
+**Commit → act → reveal.** Only the demo commitment is ever revealed;
+the main strategy's salt stays secret. A commitment nobody can ever
+check is a claim; a commitment that is revealed and recomputed is
+evidence.
+
 ## The refusal is the product
 
 The strongest evidence in this repo is not a successful match — it is a
-failed one. The refusal demo attempts two out-of-policy moves against the
-real committed strategy and the real circuit:
+failed one. The refusal demo attempts three out-of-policy moves against
+the real committed strategy and the real circuit:
 
 1. Prove EXTRACT 11 when the committed cap is 10 — the circuit refuses
    (`Assert Failed`, template line 149). No proof exists for this move.
 2. Prove EXTRACT 10 when the opponent's balance is 0 and the strategy
    says HOLD — the circuit refuses (line 140). No proof exists either.
+3. Replay turn 1's valid proof as turn 2's proof — verification fails:
+   public signals bind `matchId` + `turnNumber`, so a proof made for
+   turn N does not verify for turn M. A platform retry of the same turn
+   returns the cached response instead — the agent never proves the same
+   turn twice.
 
-In both cases the agent never sends the refused move. It answers the
-in-policy action (HOLD) and proves that one instead. A third case — a
+In all three cases the agent never sends the refused move. It answers the
+in-policy action (HOLD) and proves that one instead. A fourth case — a
 turn envelope with a tampered commitment hash — also fails closed to
 HOLD with no proof.
 
@@ -105,6 +124,20 @@ it claims — but that registry was pulled back for rework and is not in
 the official mainnet set. This entry is a concrete implementation of that
 slot: a validator returning a ZK proof per move. (Not a claim of ERC-8004
 compliance — there is no real registration.)
+
+## Beyond the game: the treasury guard
+
+The defensive strategy `[5,50,20,0,0,0,0,0]` is the same commitment
+pattern read as a treasury policy: spend (`EXTRACT`) capped at 5 per
+move, a reserve floor of 50 below which the agent fortifies instead of
+spending, and a counterparty floor of 20 below which it holds. The demo
+page runs it as a treasury guard (`npm run demo:treasury`): a spend of
+11 is refused by the circuit, a spend of 5 to an allowlisted address is
+proved, a spend outside the allowlist is rejected by the guard layer.
+The framing is honest about its boundary: the circuit is game-specific —
+it knows balances and caps, not addresses — so the allowlist lives in
+the guard layer and is labelled as such. What generalizes is the pattern
+(commit once, prove every move, reveal after), not the circuit.
 
 ## Why ZK, and not the alternatives
 
@@ -129,8 +162,11 @@ itself.
   use a free-form strategy (for example, reacting to opponent history);
   only the 8 strategy numbers can change, and every change needs a new
   commitment.
-- Idempotency is stored in an in-memory map — lost on server restart. For
-  production, use a persistent store.
+- Idempotency is stored in an in-memory map — lost on server restart.
+  Set `IDEMPOTENCY_STORE_PATH` (e.g. `/data/idempotency.json` on a
+  host with a volume) to mirror it to disk with atomic writes; Railway
+  has no volume attached, so persistence takes effect only on a host
+  with persistent disk.
 - A refused move produces no proof, so no Kurier receipt exists for a
   refusal — the demo output is the evidence.
 - The Kurier job id for a Steal proof is still pending (it needs a demo
@@ -147,7 +183,11 @@ npm run build
 npm run demo           # 20-turn match, real proofs
 npm run demo:defensive # FORTIFY + HOLD live
 npm run demo:refusal   # watch an illegal move fail
-npm test               # 19/19 tests
+npm run demo:treasury  # treasury guard — 3 examples
+npm run attack         # five attacks, all must fail
+npm run verify:proof   # verify one real proof, zero repo code
+npm run reveal:demo    # reveal the DEMO strategy, recompute its commitment
+npm test               # 24/24 tests
 ```
 
 No account, no key, no platform needed to reproduce any of it. The full
