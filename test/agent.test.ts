@@ -8,6 +8,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createApp } from "../src/server";
 import { signBody, SIGNATURE_HEADER } from "../src/hmac";
 import { decideAction, decideActionFromParams } from "../src/strategy";
@@ -16,6 +19,8 @@ import { buildCircuitInputs, ProofInputsIncompleteError } from "../src/circuitIn
 import { generatePolicyProof } from "../src/proof";
 import { computeCommitment } from "../src/poseidon";
 import { validateStrategyParams } from "../src/strategyParams";
+import { createJsonStore } from "../src/store";
+import { verifyCircuitArtifacts, PINNED_CIRCUIT_ARTIFACTS } from "../src/circuitArtifacts";
 import type { TurnEnvelope } from "../src/types";
 
 const SECRET = process.env.AGENT_GAMES_HMAC_SECRET!;
@@ -394,4 +399,90 @@ test("proof: wrong action for the state is unprovable (circuit assert)", async (
   await assert.rejects(
     generatePolicyProof(proofEnvelope(3, 100, 100), { type: "HOLD" }, { params: TEST_PARAMS, salt: testSalt }),
   );
+});
+
+test("GET /agent returns usage info without auth (no 404)", async () => {
+  const res = await fetch(`${baseUrl}/agent`);
+  assert.equal(res.status, 200);
+  const json = (await res.json()) as Record<string, unknown>;
+  assert.equal(json.service, "agent-games-steal-the-vfy");
+  assert.match(String(json.usage), /POST \/agent/);
+  assert.ok(json.exampleEnvelope, "usage must include a signed-turn example envelope");
+  assert.match(String(json.note), /read-only/);
+});
+
+test("GET /demo returns the public demo summary", async () => {
+  const res = await fetch(`${baseUrl}/demo`);
+  assert.equal(res.status, 200);
+  const json = (await res.json()) as Record<string, unknown>;
+  assert.equal(json.commitment, "0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39");
+  assert.deepEqual(json.strategyParams, [10, 0, 0, 0, 0, 0, 0, 0]);
+  const results = json.results as Record<string, string>;
+  assert.match(results.demoMatch, /20\/20/);
+  assert.match(results.refusalDemo, /3\/3/);
+  assert.equal(json.kurierStealJobId, null);
+});
+
+test("POST /verify verifies a real proof and rejects a tampered one", async () => {
+  const { proof, publicSignals } = await generatePolicyProof(
+    proofEnvelope(3, 100, 100),
+    { type: "EXTRACT", amount: 10 },
+    { params: TEST_PARAMS, salt: testSalt },
+  );
+  const postVerify = async (payload: unknown) => {
+    const res = await fetch(`${baseUrl}/verify`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return { res, body: (await res.json()) as Record<string, unknown> };
+  };
+  const good = await postVerify({ proof, publicSignals });
+  assert.equal(good.res.status, 200);
+  assert.equal(good.body.valid, true);
+  // Tamper one public signal (amount 10 -> 11): must not verify.
+  const tampered = [...publicSignals];
+  tampered[7] = (BigInt(tampered[7]) + 1n).toString();
+  const bad = await postVerify({ proof, publicSignals: tampered });
+  assert.equal(bad.res.status, 200);
+  assert.equal(bad.body.valid, false);
+  // Malformed body: 400, never a crash.
+  const malformed = await postVerify({ proof });
+  assert.equal(malformed.res.status, 400);
+  assert.equal(malformed.body.valid, false);
+});
+
+test("store: JSON store round-trips atomically and tolerates a corrupt file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "steal-store-test-"));
+  try {
+    const file = join(dir, "idempotency.json");
+    const store = createJsonStore<Array<[string, string]>>(file);
+    assert.equal(store.load(), null);
+    store.save([["k1", "v1"], ["k2", "v2"]]);
+    assert.deepEqual(store.load(), [["k1", "v1"], ["k2", "v2"]]);
+    // Atomic write: no .tmp-* file left behind.
+    assert.deepEqual(readdirSync(dir).filter((f) => f.includes(".tmp-")), []);
+    // Corrupt file: load returns null instead of throwing.
+    writeFileSync(file, "{not json");
+    assert.equal(store.load(), null);
+    // And saving again repairs it.
+    store.save([["k3", "v3"]]);
+    assert.deepEqual(store.load(), [["k3", "v3"]]);
+    assert.equal(readFileSync(file, "utf8"), JSON.stringify([["k3", "v3"]]));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("circuit artifacts: pinned SHA-256 hashes match the files on disk", () => {
+  const verified = verifyCircuitArtifacts();
+  assert.equal(verified.length, 2);
+  assert.deepEqual(
+    verified.map((v) => v.file),
+    ["vfy-policy.wasm", "vfy-policy_final.zkey"],
+  );
+  for (const v of verified) {
+    const pinned = PINNED_CIRCUIT_ARTIFACTS.find((p) => p.file === v.file)!;
+    assert.equal(v.sha256, pinned.sha256);
+  }
 });
