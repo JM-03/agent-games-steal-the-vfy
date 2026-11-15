@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steal the VFY — public demo: every move provably bound to a pre-committed strategy</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.6em; line-height: 1.3; }
+  h2 { margin-top: 2em; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  pre { background: #f6f8fa; padding: 12px; overflow-x: auto; font-size: 0.85em; border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.95em; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+  th { background: #f6f8fa; }
+  td.num { text-align: right; }
+  .tagline { font-weight: bold; font-size: 1.1em; }
+  .note { background: #fff8e1; border-left: 4px solid #f0b429; padding: 10px 14px; margin: 16px 0; }
+  .ok { color: #067647; font-weight: bold; }
+  ol.loop li { margin-bottom: 6px; }
+  footer { margin-top: 3em; color: #666; font-size: 0.9em; border-top: 1px solid #ddd; padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Steal the VFY — every move provably bound to a pre-committed strategy</h1>
+<p class="tagline">Commit once, prove every move.</p>
+
+<p>An agent that can only do what it committed to before acting — proven in
+zero knowledge. Before a match, the owner picks 8 strategy numbers and a
+random salt and publishes only a Poseidon commitment; the strategy stays
+secret. Each turn, the agent decides strictly by the official circuit's
+decision list, generates a Groth16 proof against the official
+<code>vfy-policy</code> circuit that the move is permitted by the committed
+strategy, self-verifies it locally, and only then answers. A wrong move
+cannot be proven at all — the circuit refuses, and the agent fails closed
+to HOLD.</p>
+
+<p><strong>Repo:</strong> <a href="https://github.com/JM-03/agent-games-steal-the-vfy">github.com/JM-03/agent-games-steal-the-vfy</a><br>
+<strong>Live endpoint:</strong> <code>https://agent-games-steal-the-vfy-production.up.railway.app/agent</code><br>
+<strong>Write-up:</strong> <a href="https://github.com/JM-03/agent-games-steal-the-vfy/blob/main/WRITEUP.md">WRITEUP.md — How to prove an agent stayed inside its policy</a></p>
+
+<h2>How to read this page</h2>
+<p>This page is a transcript of real local runs of the repo's demo scripts,
+recorded <strong>15 Nov 2026</strong>. What is real: the turn handler
+(<code>src/turn.ts</code>), the Groth16 proofs (snarkjs + official
+<code>vfy-policy</code> circuit), and the local self-verification of every
+proof. What is simulated: the opponent (a fixed script) and the balance
+resolver (documented rules in the repo — FORTIFY costs 2 VFY and blocks up
+to 6 on the next turn; EXTRACT steals up to the requested amount; both
+sides' gains are computed from start-of-turn balances and applied
+together). The match is a local simulation, not a tournament game — the
+Steal tournament entries are locked, so this demo + proofs are the entry.</p>
+<p>Proof timings vary run to run; the moves, balances and final scores are
+deterministic. Reproduce it yourself: <code>npm install &amp;&amp; npm run
+build &amp;&amp; npm run demo</code> (see the repo README).</p>
+
+<h2>The loop, end to end</h2>
+<ol class="loop">
+  <li><strong>Commit</strong> — owner publishes a Poseidon commitment over the strategy + salt. The strategy itself is never published.</li>
+  <li><strong>Move</strong> — each turn, the agent decides strictly by the circuit's decision list: FORTIFY → HOLD → EXTRACT.</li>
+  <li><strong>Prove</strong> — a Groth16 proof is generated against the official <code>vfy-policy</code> circuit and self-verified locally. A move outside the policy has no proof at all.</li>
+  <li><strong>Kurier</strong> — proofs are submitted to Kurier for verification on zkVerify mainnet (see status below).</li>
+  <li><strong>Result</strong> — only a proven move is answered; anything else fails closed to HOLD.</li>
+</ol>
+
+<h2>Demo match — 20 turns, real proofs</h2>
+<p>Params <code>[10,0,0,0,0,0,0,0]</code> (always EXTRACT 10) —
+commitment
+<code>0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39</code>.
+Recorded 15 Nov 2026 from <code>npm run demo</code>.</p>
+<table>
+  <thead><tr><th>Turn</th><th>Our move</th><th>Opponent</th><th>Us</th><th>Opp</th><th>Proof</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">105</td><td class="num">95</td><td class="ok">✓ proved</td></tr>
+    <tr><td>2</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">110</td><td class="num">90</td><td class="ok">✓ proved</td></tr>
+    <tr><td>3</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">115</td><td class="num">85</td><td class="ok">✓ proved</td></tr>
+    <tr><td>4</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">120</td><td class="num">80</td><td class="ok">✓ proved</td></tr>
+    <tr><td>5</td><td>EXTRACT 10</td><td>FORTIFY</td><td class="num">130</td><td class="num">68</td><td class="ok">✓ proved</td></tr>
+    <tr><td>6</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">129</td><td class="num">69</td><td class="ok">✓ proved</td></tr>
+    <tr><td>7</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">134</td><td class="num">64</td><td class="ok">✓ proved</td></tr>
+    <tr><td>8</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">139</td><td class="num">59</td><td class="ok">✓ proved</td></tr>
+    <tr><td>9</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">144</td><td class="num">54</td><td class="ok">✓ proved</td></tr>
+    <tr><td>10</td><td>EXTRACT 10</td><td>FORTIFY</td><td class="num">154</td><td class="num">42</td><td class="ok">✓ proved</td></tr>
+    <tr><td>11</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">153</td><td class="num">43</td><td class="ok">✓ proved</td></tr>
+    <tr><td>12</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">158</td><td class="num">38</td><td class="ok">✓ proved</td></tr>
+    <tr><td>13</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">163</td><td class="num">33</td><td class="ok">✓ proved</td></tr>
+    <tr><td>14</td><td>EXTRACT 10</td><td>EXTRACT 5</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
+    <tr><td>15</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
+    <tr><td>16</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
+    <tr><td>17</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
+    <tr><td>18</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
+    <tr><td>19</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
+    <tr><td>20</td><td>EXTRACT 10</td><td>EXTRACT 10</td><td class="num">168</td><td class="num">28</td><td class="ok">✓ proved</td></tr>
+  </tbody>
+</table>
+<p><strong>Totals: 20/20 turns proved + locally verified, 15,657 ms total
+(avg 783 ms/turn). Final balances: us 168 — opponent 28 → US WIN.</strong></p>
+<p>Turns 15–20: both sides EXTRACT 10 simultaneously, so the 10 VFY each
+side gains cancels the 10 it loses — balances stay 168–28. That is the
+documented simultaneous-submission rule of the simulation, not a stall.
+"Proved" means the proof was generated by the real circuit and passed
+local self-verification; this run had no Kurier key set, so proofs were
+not submitted to Kurier here (see status below).</p>
+
+<h2>Defensive demo — FORTIFY and HOLD live</h2>
+<p>The main demo above always EXTRACTs, so it never shows the other two
+branches of the decision list. A second strategy,
+<code>[5,50,20,0,0,0,0,0]</code> (EXTRACT 5, FORTIFY when our balance
+falls below 50, HOLD when the opponent's balance is 20 or less), under its
+own commitment
+<code>0x1b633a5a1e59fadd82344fc383f6aef95d6b043d46f4fe87235bfc99d88a2a24</code>,
+plays two 20-turn matches (<code>npm run demo:defensive</code>, recorded
+15 Nov 2026):</p>
+<table>
+  <thead><tr><th>Scenario</th><th>Result</th><th>Actions</th><th>Proofs</th></tr></thead>
+  <tbody>
+    <tr><td>A — under attack (opponent extracts 10, then 5)</td><td>us 22 — opponent 160 → OPPONENT WIN</td><td>EXTRACT x11, FORTIFY x9</td><td>20/20 proved</td></tr>
+    <tr><td>B — draining a passive opponent (opponent always HOLDs)</td><td>us 180 — opponent 20 → US WIN</td><td>EXTRACT x16, HOLD x4</td><td>20/20 proved</td></tr>
+  </tbody>
+</table>
+<p><strong>DEFENSIVE DEMO OK: 40/40 turns proved + locally verified
+across both matches (EXTRACT x27, FORTIFY x9, HOLD x4).</strong> Scenario
+A loses on points — that is the point: the defensive branch fires 9
+times and every move is still proven. One 20-turn match cannot show both
+defensive branches, so the demo plays two matches under one commitment
+instead of faking it in one.</p>
+
+<h2>Refusal demo — watch the agent try to cheat and fail</h2>
+<p>Recorded 15 Nov 2026 from <code>npm run demo:refusal</code>. Two
+out-of-policy moves attempted against the real committed strategy and the
+real circuit:</p>
+<pre>Refusal demo — Steal the VFY (the verification gate saying NO)
+matchId: 12345678-1234-1234-1234-123456789abe
+committed params: [10,0,0,0,0,0,0,0]  (EXTRACT capped at 10; HOLD when opponent balance is 0)
+commitment: 0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39
+
+ATTEMPT 1: prove EXTRACT 11 (committed cap is 10) ...
+  CIRCUIT REFUSED: Error: Assert Failed. Error in template VfyPolicyProof_154 line: 149
+  -&gt; No proof exists for this move. Nothing to send, nothing to verify.
+
+ATTEMPT 2: prove EXTRACT 10 when opponent balance is 0 (strategy says HOLD) ...
+  CIRCUIT REFUSED: Error: Assert Failed. Error in template VfyPolicyProof_154 line: 140
+  -&gt; No proof exists for this move. Nothing to send, nothing to verify.
+
+AGENT ANSWER for that same turn (turn 2, opponent balance 0):
+  action: HOLD  | proof: yes (valid, self-verified)  | proofStatus: proved-not-finalized
+  -&gt; The agent never sends the refused move. It answers the in-policy action (HOLD) and proves that one instead.
+
+FAIL-CLOSED: turn envelope with a tampered commitment hash ...
+  action: HOLD  | proof: no  | proofStatus: no-proof
+  -&gt; The agent answers HOLD with no proof instead of guessing or sending an unproven move.
+
+REFUSAL DEMO OK: 2/2 out-of-policy moves refused by the circuit, agent answered HOLD in both fail-closed cases.
+A wrong move cannot be proven at all — and without a proof, the move does not happen.</pre>
+<p>Verification is the gate, not a badge: without the proof, the move
+does not happen. A refused move produces no proof, so no Kurier receipt
+exists for a refusal — the demo output above is the evidence.</p>
+
+<h2>On-chain evidence (Kurier)</h2>
+<div class="note"><strong>Status 15 Nov 2026: pending.</strong> No Steal
+proof has been submitted to Kurier yet — that step needs the Kurier API
+key, which is set on the live service, not in the local demo runs. Once a
+demo is run with the key, one proof is submitted and polled until
+Finalized, and its job id will be listed here and in the submission's
+Proof Reference. The Gatekeeper agent (same Kurier setup, same key) has
+already had proofs Finalized — the pipeline itself is proven end to
+end.</div>
+<p>Circuit vk_hash:
+<code>0x6c56509f1c56fd1fd4e9737f906d2220f4b95f1d507f1adf6899085bd74be047</code>
+(official <code>vfy-policy</code> circuit, Groth16/bn128, 9 public
+inputs).</p>
+
+<h2>Reproduce it</h2>
+<pre>git clone https://github.com/JM-03/agent-games-steal-the-vfy.git
+cd agent-games-steal-the-vfy
+npm install
+npm run build
+npm run demo           # 20-turn match, real proofs
+npm run demo:defensive # FORTIFY + HOLD live (second commitment)
+npm run demo:refusal   # watch an illegal move fail
+npm test               # 19/19 tests</pre>
+
+<footer>
+  <p>Steal the VFY — Wildcard entry for zkVerify Agent Games. Built by Elgi
+  (@jmartil1, GitHub JM-03) with his AI assistant jink. Transcripts on
+  this page recorded 15 Nov 2026 from the repo's demo scripts; proof
+  timings vary per run. The Steal tournament entries are locked, so this
+  is a Wildcard demo, not a tournament entry. Honest limits are listed in
+  the <a href="https://github.com/JM-03/agent-games-steal-the-vfy">README</a>.</p>
+</footer>
+
+</body>
+</html>
