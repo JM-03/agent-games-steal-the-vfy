@@ -19,6 +19,7 @@ import { computePublicInputsHash } from "./publicInputsHash";
 import { decideAction, toStrategyContext } from "./strategy";
 import { generatePolicyProof, submitProofToKurier, pollKurierJob, type GeneratedProof } from "./proof";
 import { ProofInputsIncompleteError } from "./circuitInputs";
+import { createJsonStore } from "./store";
 import type { Action, PolicyProof, TurnEnvelope, TurnResponse } from "./types";
 
 export interface TurnOutcome {
@@ -28,7 +29,69 @@ export interface TurnOutcome {
   reason: string;
 }
 
-const seenKeys = new Map<string, TurnOutcome>();
+const MAX_SEEN_KEYS = 1000;
+
+/**
+ * Idempotency store: an in-memory map, mirrored to disk when
+ * IDEMPOTENCY_STORE_PATH is set (see src/store.ts — JSON file, atomic
+ * tmp -> rename write). Without the variable it behaves exactly as
+ * before (memory only). A corrupt store file is ignored with a warning
+ * (start empty); save failures are logged, never thrown — the in-memory
+ * map stays authoritative for the running process.
+ */
+class IdempotencyStore {
+  private map = new Map<string, TurnOutcome>();
+  private store = config.idempotencyStorePath
+    ? createJsonStore<Array<[string, TurnOutcome]>>(config.idempotencyStorePath)
+    : null;
+  private loaded = false;
+
+  private ensureLoaded(): void {
+    if (this.loaded) return;
+    this.loaded = true;
+    if (!this.store) return;
+    const data = this.store.load();
+    if (Array.isArray(data)) {
+      for (const [k, v] of data) {
+        if (typeof k === "string" && v && typeof v === "object") this.map.set(k, v as TurnOutcome);
+      }
+      if (this.map.size > 0) {
+        console.log(`[store] loaded ${this.map.size} idempotency entries from ${this.store.path}`);
+      }
+    }
+  }
+
+  get(key: string): TurnOutcome | undefined {
+    this.ensureLoaded();
+    return this.map.get(key);
+  }
+
+  set(key: string, outcome: TurnOutcome): void {
+    this.ensureLoaded();
+    this.map.set(key, outcome);
+    if (this.map.size > MAX_SEEN_KEYS) {
+      const first = this.map.keys().next().value;
+      if (first) this.map.delete(first);
+    }
+    this.store?.save([...this.map.entries()]);
+  }
+
+  get size(): number {
+    this.ensureLoaded();
+    return this.map.size;
+  }
+
+  get persistent(): boolean {
+    return this.store !== null;
+  }
+}
+
+const seenKeys = new IdempotencyStore();
+
+/** For tests/diagnostics: is idempotency persisted to disk in this process? */
+export function isIdempotencyPersistent(): boolean {
+  return seenKeys.persistent;
+}
 
 /**
  * Deterministic UUIDv5-style idempotency key for one turn.
@@ -131,11 +194,6 @@ export async function handleTurn(envelope: TurnEnvelope): Promise<TurnOutcome> {
 
   const finish = (outcome: TurnOutcome): TurnOutcome => {
     seenKeys.set(key, outcome);
-    if (seenKeys.size > 1000) {
-      // Bound memory: drop the oldest entries.
-      const first = seenKeys.keys().next().value;
-      if (first) seenKeys.delete(first);
-    }
     return outcome;
   };
 

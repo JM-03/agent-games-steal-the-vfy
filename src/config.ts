@@ -36,6 +36,13 @@ export const config = {
   // Set PROOF_ENABLED=false explicitly to answer turns without a proof
   // (the platform then scores the turn as HOLD).
   proofEnabled: process.env.PROOF_ENABLED !== "false",
+  // Optional persistent idempotency store (see src/store.ts). Unset =
+  // memory only (previous behavior). Set to a path on a host with a
+  // volume (e.g. /data/idempotency.json) to survive restarts/redeploys.
+  // NOTE: Railway has no volume attached, so this only takes effect on a
+  // host with persistent disk — it ships with the next deploy; until
+  // then the agent keeps the in-memory behavior.
+  idempotencyStorePath: process.env.IDEMPOTENCY_STORE_PATH || "",
   wasmPath: path.join(__dirname, "..", "circuits", "vfy-policy.wasm"),
   zkeyPath: path.join(__dirname, "..", "circuits", "vfy-policy_final.zkey"),
 } as const;
