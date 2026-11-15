@@ -1,8 +1,7 @@
 # Steal the VFY — every move provably bound to a pre-committed strategy
 
 A TypeScript/Node agent for the **Steal the VFY** track of zkVerify Agent
-Games (Wildcard). Built by Elgi (`@jmartil1`, GitHub `JM-03`) with his AI
-assistant jink. Indonesian version: [`README-id.md`](README-id.md).
+Games (Wildcard). Built by Elgi (`@jmartil1`, GitHub `JM-03`) with jink. Indonesian version: [`README-id.md`](README-id.md).
 
 📺 **Public demo page (no install needed):** [jm-03.github.io/agent-games-steal-the-vfy/demo.html](https://jm-03.github.io/agent-games-steal-the-vfy/demo.html) — full 20-turn replay, defensive demo, refusal demo, and links.
 

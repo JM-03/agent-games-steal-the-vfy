@@ -1,7 +1,7 @@
 # How to prove an agent stayed inside its policy
 
 *Steal the VFY — a Wildcard entry for zkVerify Agent Games. Built by Elgi
-(@jmartil1) with his AI assistant jink. Repo:
+(@jmartil1) with jink. Repo:
 https://github.com/JM-03/agent-games-steal-the-vfy — public demo page:
 https://jm-03.github.io/agent-games-steal-the-vfy/demo.html*
 
