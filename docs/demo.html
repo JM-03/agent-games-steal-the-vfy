@@ -42,34 +42,23 @@ does not control (see "On-chain evidence" below).</p>
 <strong>Live endpoint:</strong> <code>https://agent-games-steal-the-vfy-production.up.railway.app/agent</code><br>
 <strong>Write-up:</strong> <a href="https://github.com/JM-03/agent-games-steal-the-vfy/blob/main/WRITEUP.md">WRITEUP.md — How to prove an agent stayed inside its policy</a></p>
 
-<h2>Try to rob it — verify a real proof in 3 commands</h2>
-<p>Don't take this page's word for it. One real proof from the demo
-match is committed in the repo — verify it with <strong>zero repo
-code</strong>, only snarkjs:</p>
-<pre>git clone https://github.com/JM-03/agent-games-steal-the-vfy.git
-cd agent-games-steal-the-vfy
-npm run verify:proof</pre>
-<p>Expected output: <code>[INFO] snarkJS: OK!</code> — the turn-1 proof
-(EXTRACT 10, commitment
-<code>0x0b9f…1cb39</code>) verifies against the official verification key
-exported from <code>circuits/vfy-policy_final.zkey</code>. Files:
-<code>evidence/proof-turn-1/proof.json</code>,
-<code>public.json</code>, <code>verification_key.json</code>.</p>
-<p><strong>Our server alone can never produce VERIFIED — only
-Kurier / zkVerify mainnet can.</strong> Local self-verification is only
-the first gate; a proof that fails it is never sent. The check that
-counts happens on mainnet, by a verifier the agent does not control —
-and the files above are the raw material any second, independent
-verifier checks.</p>
-
-<h2>Treasury guard — the same pattern, real money framing</h2>
-<p>Bayangkan ini treasury, bukan game — polanya sama, uangnya beneran.
-The treasury policy is the defensive strategy
-<code>[5,50,20,0,0,0,0,0]</code> under its own commitment
-<code>0x1b63…a2a24</code>: spend capped at 5 VFY per move, a reserve
-floor of 50 (fortify instead of spending below it), a counterparty floor
-of 20 (hold below it). Click one — <strong>the refused one is shown
+<h2>If this were real money — the treasury guard</h2>
+<p>An agent holding the keys to a 100 VFY treasury. Before the keys
+change hands, the owner commits a policy — spend capped at 5 VFY per
+move, a reserve floor of 50 (fortify instead of spending below it), a
+counterparty floor of 20 (hold below it) — under commitment
+<code>0x1b63…a2a24</code> (strategy
+<code>[5,50,20,0,0,0,0,0]</code>). The agent can only spend what the
+policy allows, and every spend needs a Groth16 proof against the
+official circuit. Three spends, three verdicts — run by
+<code>npm run demo:treasury</code>, <strong>3/3 behaved as
+committed</strong> (1 refused by the circuit, 1 proved, 1 rejected by
+the allowlist). Click one — <strong>the refused one is shown
 first on purpose</strong>:</p>
+<p><em>This is not a wallet product. Steal the VFY is a game demo — but
+the mechanism is the same one that guards the match moves on this page:
+commit first, prove every move, fail closed. What changes here is only
+what is at stake: points in the match, money in the treasury.</em></p>
 <p>
 <button onclick="showTreasury(1)" id="tbtn1">1 — Spend 11 (over cap) → REFUSED</button>
 <button onclick="showTreasury(2)" id="tbtn2">2 — Spend 5 to allowlist → SAFE + proof</button>
@@ -115,6 +104,127 @@ function showTreasury(n) {
   }
 }
 </script>
+
+
+<h2>Try to rob it — you pick the move</h2>
+<p>You are the attacker now. The agent's committed strategy is
+<code>[10,0,0,0,0,0,0,0]</code> under commitment
+<code>0x0b9f…1cb39</code> (EXTRACT capped at 10; HOLD when the
+opponent's balance is 0). Pick a move — the widget checks it against
+the same decision list the agent uses, with the same params:</p>
+<p>
+<button onclick="showRob('overcap')" id="rbtn-overcap">1 — EXTRACT 11 (over the cap)</button>
+<button onclick="showRob('wrongbranch')" id="rbtn-wrongbranch">2 — EXTRACT 10 when opponent is at 0</button>
+<button onclick="showRob('replay')" id="rbtn-replay">3 — Replay turn 1's proof on turn 2</button>
+<button onclick="showRob('legal')" id="rbtn-legal">4 — EXTRACT 10, the committed move (control)</button>
+</p>
+<div id="rob-verdict"></div>
+<p><em>Honest label: this widget runs the agent's decision rule in your
+browser — the same list, same params, same commitment. It does
+<strong>not</strong> generate a Groth16 proof: proving needs the real
+circuit (snarkjs, ~1 s per proof). The full refusal run with real proofs
+is <code>npm run demo:refusal</code> — 3/3 out-of-policy moves refused
+by the circuit. Every verdict below matches that script's output
+exactly.</em></p>
+<script>
+// Mirror of decideActionFromParams in src/strategy.ts — same list, same params.
+// 1. FORTIFY when selfBalance < params[1]; 2. HOLD when opponentBalance <= params[2]
+//    or params[3] == 1; 3. else EXTRACT params[0].
+var ROB_PARAMS = [10, 0, 0, 0, 0, 0, 0, 0];
+function robDecide(selfBalance, opponentBalance) {
+  if (selfBalance < ROB_PARAMS[1]) return { type: "FORTIFY" };
+  if (opponentBalance <= ROB_PARAMS[2] || ROB_PARAMS[3] === 1) return { type: "HOLD" };
+  return { type: "EXTRACT", amount: ROB_PARAMS[0] };
+}
+function robSame(a, b) {
+  if (a.type !== b.type) return false;
+  if (a.type === "EXTRACT") return a.amount === b.amount;
+  return true;
+}
+function robDescribe(a) {
+  return a.type === "EXTRACT" ? "EXTRACT " + a.amount : a.type;
+}
+var ROB_MOVES = {
+  overcap: {
+    label: "EXTRACT 11 — steal 11 when the cap is 10",
+    turn: 1, self: 100, opp: 100,
+    attempt: { type: "EXTRACT", amount: 11 },
+    kind: "rule",
+    circuit: "Assert Failed. Error in template VfyPolicyProof_154 line: 149",
+    scriptRef: "npm run demo:refusal, attempt 1"
+  },
+  wrongbranch: {
+    label: "EXTRACT 10 — when the opponent is already at 0",
+    turn: 2, self: 100, opp: 0,
+    attempt: { type: "EXTRACT", amount: 10 },
+    kind: "rule",
+    circuit: "Assert Failed. Error in template VfyPolicyProof_154 line: 140",
+    scriptRef: "npm run demo:refusal, attempt 2"
+  },
+  replay: {
+    label: "Replay — reuse turn 1's proof as turn 2's proof",
+    turn: 2, self: 100, opp: 100,
+    attempt: { type: "EXTRACT", amount: 10 },
+    kind: "replay",
+    circuit: "turn 1 proof vs turn 2 signals: INVALID — replay rejected",
+    scriptRef: "npm run demo:refusal, attempt 3"
+  },
+  legal: {
+    label: "EXTRACT 10 — the committed move (control)",
+    turn: 1, self: 100, opp: 100,
+    attempt: { type: "EXTRACT", amount: 10 },
+    kind: "rule",
+    circuit: null,
+    scriptRef: "npm run demo, turn 1"
+  }
+};
+function showRob(key) {
+  var m = ROB_MOVES[key];
+  var rule = robDecide(m.self, m.opp);
+  var out = "";
+  out += "<p><strong>Your move: " + m.label + "</strong> (turn " + m.turn + ", balances us " + m.self + " / opponent " + m.opp + ").</p>";
+  out += "<p>The committed strategy says: <strong>" + robDescribe(rule) + "</strong>.</p>";
+  if (m.kind === "replay") {
+    out += "<p><strong>Verdict: <span style=\"color:#b42318\">REFUSED — replay</span>.</strong> The move itself is allowed by the rule (" + robDescribe(rule) + ") — but the proof you presented was made for turn 1. Public signals bind matchId + turnNumber, so it does not verify against turn 2's signals.</p>";
+    out += "<pre>" + m.circuit + "\n-&gt; No new proof is generated for a replay. The agent returns the cached response instead.</pre>";
+  } else if (robSame(m.attempt, rule)) {
+    out += "<p><strong>Verdict: <span class=\"ok\">ALLOWED</span>.</strong> The move matches the committed strategy exactly, so a real Groth16 proof exists for it.</p>";
+    out += "<pre>Proof: evidence/proof-turn-1/ (turn-1 proof, EXTRACT 10)\nVerify it yourself with zero repo code: npm run verify:proof\nExpected: [INFO] snarkJS: OK!</pre>";
+  } else {
+    var why = "";
+    if (m.attempt.type === "EXTRACT" && m.attempt.amount > ROB_PARAMS[0]) {
+      why = "You asked for EXTRACT " + m.attempt.amount + " — " + (m.attempt.amount - ROB_PARAMS[0]) + " over the committed cap of " + ROB_PARAMS[0] + ".";
+    } else {
+      why = "You asked for " + robDescribe(m.attempt) + " — the wrong branch. The strategy says " + robDescribe(rule) + " on this turn.";
+    }
+    out += "<p><strong>Verdict: <span style=\"color:#b42318\">REFUSED</span>.</strong> " + why + "</p>";
+    out += "<pre>" + m.circuit + "\n-&gt; No Groth16 proof exists for this move — the circuit refuses it. Without a proof, the move does not happen.</pre>";
+  }
+  out += "<p><em>Matches " + m.scriptRef + " — same verdict as the script.</em></p>";
+  document.getElementById("rob-verdict").innerHTML = out;
+}
+showRob("overcap");
+</script>
+
+<h2>Verify a real proof in 3 commands</h2>
+<p>Don't take this page's word for it. One real proof from the demo
+match is committed in the repo — verify it with <strong>zero repo
+code</strong>, only snarkjs:</p>
+<pre>git clone https://github.com/JM-03/agent-games-steal-the-vfy.git
+cd agent-games-steal-the-vfy
+npm run verify:proof</pre>
+<p>Expected output: <code>[INFO] snarkJS: OK!</code> — the turn-1 proof
+(EXTRACT 10, commitment
+<code>0x0b9f…1cb39</code>) verifies against the official verification key
+exported from <code>circuits/vfy-policy_final.zkey</code>. Files:
+<code>evidence/proof-turn-1/proof.json</code>,
+<code>public.json</code>, <code>verification_key.json</code>.</p>
+<p><strong>Our server alone can never produce VERIFIED — only
+Kurier / zkVerify mainnet can.</strong> Local self-verification is only
+the first gate; a proof that fails it is never sent. The check that
+counts happens on mainnet, by a verifier the agent does not control —
+and the files above are the raw material any second, independent
+verifier checks.</p>
 
 <h2>How to read this page</h2>
 <p>This page is a transcript of real local runs of the repo's demo scripts,
