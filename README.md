@@ -23,6 +23,8 @@ assistant jink. Indonesian version: [`README-id.md`](README-id.md).
 > runnable refusal demo (a wrong move the circuit will not prove).
 > Defensive demo added 15 Nov: a second strategy `[5,50,20,0,0,0,0,0]`
 > under its own commitment, 40/40 proved, FORTIFY x9 + HOLD x4 live.
+> 16 Nov: added "Verified on mainnet" — the differentiator vs entries
+> whose proofs are only checked by their own code.
 > The Steal tournament is **locked** (8 agents paired, Round 1 running
 > 13–17 Nov) — so this repo is submitted as a **Wildcard** entry: a runnable
 > demo + real proofs as evidence, not a tournament participant.
@@ -260,6 +262,20 @@ Every move in this repo carries such a proof — 20 per match, 60 across
 the three demo matches — and each one is independently verifiable on
 zkVerify mainnet.
 
+## Verified on mainnet, not just by the agent itself
+
+A proof that only the agent's own code verifies proves nothing to
+anyone else — the agent could verify anything it likes and print
+"valid". Local self-verification is only the first gate in this repo:
+a proof that fails it is never sent. The check that counts happens on
+zkVerify mainnet, where the proof is submitted via Kurier and polled
+until Finalized — by a verifier the agent does not control.
+
+The same submit-and-poll path already returned Finalized jobs in live
+scored Gatekeeper rounds (three jobs, 13 Nov). The first Steal
+Finalized job id is pending — it goes in Proof Reference below as soon
+as the demo runs with the key set.
+
 ## How this compares
 
 There is more than one way to make an agent's behavior checkable. This
@@ -274,6 +290,7 @@ real alternatives, not a default:
 | TEE-based agents (Oasis ROFL, NEAR Shade, Phala) | That the correct code is running, attested by hardware | The hardware vendor (Intel SGX/TDX, NVIDIA) and the attestation chain | When hardware attestation is available and trusted |
 | Lit-style signing policy (Lit Protocol, Vincent) | That only an authorized signer can sign, under a policy enforced at signing time | The threshold network / TEE that holds the key shares | When the question is *who may sign* |
 | Agent + audit log | Nothing independently — the log says what the agent claims it did | The agent's own logs | Never, for money: logs the agent wrote about itself prove nothing |
+| Proof verified only by the agent's own code | That the proof is well-formed — nothing about who checked it | The agent that produced the proof | Never, as evidence to a third party: a verifier the prover controls is not independent |
 
 The spectrum, stated plainly: a TEE is proof by hardware, a bond/slashing
 scheme is proof by economics, multi-model consensus is proof by social
