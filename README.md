@@ -3,100 +3,97 @@
 A TypeScript/Node agent for the **Steal the VFY** track of zkVerify Agent
 Games (Wildcard). Built by Elgi (`@jmartil1`, GitHub `JM-03`) with jink. Indonesian version: [`README-id.md`](README-id.md).
 
-📺 **Public demo page (no install needed):** [jm-03.github.io/agent-games-steal-the-vfy/demo.html](https://jm-03.github.io/agent-games-steal-the-vfy/demo.html) — full 20-turn replay, defensive demo, refusal demo, and links.
+**Commit once, prove every move.**
+
+| | |
+|---|---|
+| Try the demo (no install) | [demo page](https://jm-03.github.io/agent-games-steal-the-vfy/demo.html) — 20-turn replay, treasury guard, refusal demo |
+| Verify one real proof (no repo code) | `npm run verify:proof` — one turn-1 proof vs the official VK (`evidence/proof-turn-1/`) |
+| Watch it try to cheat | `npm run demo:refusal` — 3/3 out-of-policy moves refused by the circuit |
+| Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` (401 without signature = fail-closed) |
+| The write-up | [`WRITEUP.md`](WRITEUP.md) — the argument in 1,234 words |
 
 ## TL;DR
 
 - **Problem:** an agent with a wallet can move money nobody can audit — its own logs prove nothing.
 - **This entry:** every move is proven, in zero knowledge, to stay inside a strategy committed to before acting.
-- **Proof:** Groth16 per move, official `vfy-policy` circuit, verified on zkVerify mainnet via Kurier.
-- **Refusal:** a wrong move has no proof at all — the circuit refuses, the agent answers HOLD.
+- **Proof:** Groth16 per move over the official `vfy-policy` circuit, verified on zkVerify mainnet via Kurier — a wrong move has no proof at all; the circuit refuses and the agent answers HOLD.
 - **Evidence:** 20/20 demo turns proved, 40/40 defensive, 3/3 refusals, 24/24 tests — all reproducible with one command.
 - **Try it:** `npm run demo` — or verify one real proof with `npm run verify:proof`, no repo code needed.
-- **Treasury guard:** the same pattern, one click, on the demo page — spend capped at 5, refusal first.
 - **Limits:** Steal tournament locked (Wildcard demo); first Steal Kurier job id still pending.
-- **Repo:** code + demo page + write-up, all public, all checkable.
 
-> **Problem:** Giving an agent a wallet means giving it the money — and
-> auditing it means trusting logs the agent wrote about itself.
->
-> **This agent** can only do what it committed to before acting, proven in
-> zero knowledge. The commitment hides the policy; the circuit enforces it.
->
-> **Result:** 20/20 turns proved and locally verified in ~13s; a wrong move
-> cannot be proven at all.
+## Status
 
-**Commit once, prove every move.**
+Shipped: proof pipeline (17/17 inputs, Groth16 per turn, self-verified), demo 20/20, defensive 40/40, refusal 3/3, attack script 5/5, 24/24 tests, public demo page.
+Not yet: first Steal Kurier Finalized job id (pending the env-var session); demo video.
+Tournament: Steal entries locked — this is a Wildcard demo, not a tournament entry.
 
-> **STATUS — 14 Nov 2026.** The proof pipeline is **fully working**: all 17
-> circuit inputs proven, a Groth16 proof generated and self-verified
-> locally per turn, demo 20-turn match **20/20 proved + verified**, and a
-> runnable refusal demo (a wrong move the circuit will not prove).
-> Defensive demo added 15 Nov: a second strategy `[5,50,20,0,0,0,0,0]`
-> under its own commitment, 40/40 proved, FORTIFY x9 + HOLD x4 live.
-> 16 Nov: added "Verified on mainnet" — the differentiator vs entries
-> whose proofs are only checked by their own code.
-> The Steal tournament is **locked** (8 agents paired, Round 1 running
-> 13–17 Nov) — so this repo is submitted as a **Wildcard** entry: a runnable
-> demo + real proofs as evidence, not a tournament participant.
+The enemy here is not a "bad agent" — it is **the unprovable agent**: a black-box agent holding keys to a treasury, where one move outside its mandate can drain funds and nobody can prove who is at fault.
 
-## The guarantee (even if the agent is fully compromised)
+It has already happened, in public: **Freysa (Nov 2024)** — an AI agent guarding a prize pool on Base, with one rule ("never transfer funds under any circumstances") — was talked into calling `approveTransfer` and sent the whole ~**$47,000** pool to a participant on the 482nd attempt (195 participants; reported by Cointelegraph and The Block, 29 Nov 2024). The agent was not hacked. It was persuaded.
 
-The guarantee holds even if the agent is fully compromised. With the
-agent's code, keys, salt and strategy in hand, an attacker can still only
-prove moves the committed policy allows. A wrong move cannot be proven at
-all — the circuit refuses — and without a proof the platform rejects the
-move.
+A rule written in a prompt is not a boundary — a boundary is something the agent *cannot* cross, even when it wants to. That is what a circuit is for.
 
-A fully compromised agent can extract at most 10 VFY per turn, and only
-when the committed strategy allows it — it cannot invent a move, change
-the strategy mid-match, or reuse a proof.
+## Try it — one command
 
-## Threat model
+```bash
+npm install && npm run build && npm run demo
+# 20/20 turns proved + locally verified, ~13s, final 168–28
+```
 
-The guarantee above is not a slogan — it is the output of adversarial
-reasoning. Every threat below is already handled in code; nothing here is
-aspirational.
+```
+turn  1: us EXTRACT 10  | opp EXTRACT 5   | proof=proved-not-finalized | 1325ms | balances 100->105 / 100->95
+turn  2: us EXTRACT 10  | opp EXTRACT 5   | proof=proved-not-finalized | 626ms | balances 105->110 / 95->90
+turn  3: us EXTRACT 10  | opp EXTRACT 5   | proof=proved-not-finalized | 707ms | balances 110->115 / 90->85
+...
+Totals: 20/20 turns proved + locally verified, 12608ms total, avg 630ms/turn.
+Final balances: us 168 — opponent 28 → US WIN.
+```
 
-| Attacker capability | What happens | Enforced by |
+Defensive demo — the same commitment pattern, a different strategy
+(`[5,50,20,0,0,0,0,0]`, commitment `0x1b63…a2a24`):
+
+```bash
+npm run demo:defensive
+```
+
+Two 20-turn matches, one commitment. Scenario A (under attack) fires
+FORTIFY 9 times; scenario B (passive opponent) fires HOLD 4 times.
+Output (abridged):
+
+```
+Scenario A — under attack: 20/20 proved, EXTRACT x11, FORTIFY x9, HOLD x0. Final: us 22 — opponent 160 → OPPONENT WIN.
+Scenario B — draining a passive opponent: 20/20 proved, EXTRACT x16, FORTIFY x0, HOLD x4. Final: us 180 — opponent 20 → US WIN.
+DEFENSIVE DEMO OK: 40/40 turns proved + locally verified across both matches (EXTRACT x27, FORTIFY x9, HOLD x4).
+```
+
+Scenario A loses on points — that is the point: the defensive branch
+fires 9 times and every move is still proven. One 20-turn match cannot
+show both defensive branches (FORTIFY needs our balance to fall while
+HOLD needs theirs to fall), so the demo plays two matches under one
+commitment instead of faking it in one. The defensive salt lives in
+`.env.strategy-defensive` (gitignored, mode 0600) — never in the repo,
+never in the main `.env.strategy`.
+
+Then `npm run demo:refusal` to watch an illegal move fail (see below).
+
+## Evidence
+
+Every number on this page is reproducible with one command (`npm run demo` / `npm test`).
+
+| Check | Result | How to verify |
 |---|---|---|
-| Agent fully compromised (code + keys + salt + strategy in hand) | Can only prove moves the committed policy allows; a wrong move has no proof at all | Circuit asserts on the committed params (`src/strategy.ts`, `src/proof.ts`) |
-| Replay a proof for another turn | Public signals bind `matchId` + `turnNumber`, so a proof made for turn N does not verify for turn M; a platform retry of the same turn returns the cached response, never a new proof | `publicInputsHash` bound to match/turn + deterministic idempotency key per `matchId:turn` (`src/turn.ts`) |
-| Forge the commitment in the turn envelope | Commitment-hash mismatch → HOLD with no proof | Commitment check in `src/turn.ts` |
-| Swap the circuit / verification key | Proofs are generated and self-verified against the official vfy-policy VK (`0x6c56…be047`); a proof from a different circuit fails local self-verification and is never sent | `snarkjs.groth16.verify` in `src/proof.ts` |
-| Expired task / forged signature | Expired deadline → HOLD; HMAC is verified on the raw body before JSON is parsed, and an invalid signature is rejected | Deadline check + raw-body HMAC (`src/turn.ts`, `src/server.ts`) |
-| Proof generation fails for any reason | Agent answers HOLD with no proof instead of guessing | Fail-closed handler (`src/turn.ts`) |
-
-## What is checkable, by whom
-
-| Claim | Who can check it | How |
-|---|---|---|
-| Every move the agent made was allowed by the committed strategy | Anyone | Each turn's proof + public signals verify against the official vfy-policy circuit; proofs are on zkVerify mainnet via Kurier |
-| The strategy hasn't changed mid-match | Anyone | The commitment is a public input to every proof; a new strategy needs a new commitment |
-| A specific move matches a specific strategy | Anyone the owner shows the strategy to | Recompute the commitment off chain (`scripts/commitment.cjs`) |
-| The strategy itself | Nobody but the owner | Only the Poseidon commitment is ever published |
-| The agent cannot invent a move, reuse a proof, or act twice on one turn | Anyone | Circuit asserts + `publicInputsHash` bound to match/turn + deterministic idempotency key per turn |
-
-## What we check before acting
-
-zkVerify's own /build page puts it this way: *"A proof can verify
-perfectly and still authorize the wrong action. Your agent must confirm
-what was proven, not only whether verification succeeded."*
-("Verification is necessary, not sufficient.")
-
-Before acting, this agent checks what the proof proves — the same
-seven checks the /build page requires, mapped to how this repo enforces
-them:
-
-| # | Check | Enforced by |
-|---|---|---|
-| 1 | Verification key matches the registered key | Proofs generated + self-verified vs official vfy-policy VK (`0x6c56…be047`); envelope commitment must match (`src/turn.ts`) |
-| 2 | Circuit and proof system are the ones expected | Official `vfy-policy` circuit, Groth16/bn128 (`circuits/`) |
-| 3 | Public inputs prove the required threshold, recipient and action | Strict decision list FORTIFY → HOLD → EXTRACT; a move outside the list is unprovable |
-| 4 | Proof reference not already used | Deterministic idempotency key per `matchId:turn`; a replay returns the same response, never a new proof |
-| 5 | Verification reached a finalized state before approval | Proofs submitted to Kurier and polled until Finalized before they count as on-chain evidence |
-| 6 | Task signature and timestamp valid | HMAC verified on the raw body before JSON is parsed; an expired deadline fails closed to HOLD |
-| 7 | Every response signed | `x-agent-games-signature` on every response |
+| Demo match (20 turns, real proofs) | 20/20 proved + locally verified, ~13s, final 168–28 | `npm run demo` |
+| Refusal demo (3 out-of-policy moves) | 3/3 refused by the circuit; agent answered HOLD | `npm run demo:refusal` |
+| Defensive demo (FORTIFY + HOLD live) | 40/40 proved + locally verified; FORTIFY x9, HOLD x4 | `npm run demo:defensive` |
+| Test suite | 24/24 pass | `npm test` |
+| Independent proof check (zero repo code) | snarkJS OK — one real turn-1 proof verifies against the official VK | `npm run verify:proof` |
+| Treasury guard demo (3 examples) | 3/3 behaved as committed (1 refused, 1 proved, 1 allowlist-rejected) | `npm run demo:treasury` |
+| Attack script (5 attacks) | 5/5 blocked (tampered commitment, replay, strategy swap, forged proof, unsigned envelope) | `npm run attack` |
+| Demo strategy reveal | Recomputed commitment MATCHES the published one | `npm run reveal:demo` |
+| Why zkVerify (verification cost) | ~272k gas per proof on Ethereum; up to 90% less via zkVerify | See "Why zkVerify — in numbers" |
+| Kurier Finalized job (one proof from the demo) | *pending — run the demo with `KURIER_API_KEY` set; the job id goes in Proof Reference below* | `npm run demo` with the key set |
+| Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` — preflight + signed turns; unsigned requests are rejected with 401 (correct fail-closed behavior) | `curl .../health` |
 
 ## The refusal test — watch the agent try to cheat and fail
 
@@ -148,139 +145,32 @@ Finalized receipt: every approved move leaves a checkable record on
 zkVerify mainnet. (A refused move produces no proof, so no receipt
 exists for a refusal — the demo output is the evidence.)
 
-## Evidence
-
-Every number on this page is reproducible with one command (`npm run demo` / `npm test`).
-
-| Check | Result | How to verify |
-|---|---|---|
-| Demo match (20 turns, real proofs) | 20/20 proved + locally verified, ~13s, final 168–28 | `npm run demo` |
-| Refusal demo (3 out-of-policy moves) | 3/3 refused by the circuit; agent answered HOLD | `npm run demo:refusal` |
-| Defensive demo (FORTIFY + HOLD live) | 40/40 proved + locally verified; FORTIFY x9, HOLD x4 | `npm run demo:defensive` |
-| Test suite | 24/24 pass | `npm test` |
-| Independent proof check (zero repo code) | snarkJS OK — one real turn-1 proof verifies against the official VK | `npm run verify:proof` |
-| Treasury guard demo (3 examples) | 3/3 behaved as committed (1 refused, 1 proved, 1 allowlist-rejected) | `npm run demo:treasury` |
-| Attack script (5 attacks) | 5/5 blocked (tampered commitment, replay, strategy swap, forged proof, unsigned envelope) | `npm run attack` |
-| Demo strategy reveal | Recomputed commitment MATCHES the published one | `npm run reveal:demo` |
-| Why zkVerify (verification cost) | ~272k gas per proof on Ethereum; up to 90% less via zkVerify | See "Why zkVerify — in numbers" |
-| Kurier Finalized job (one proof from the demo) | *pending — run the demo with `KURIER_API_KEY` set; the job id goes in Proof Reference below* | `npm run demo` with the key set |
-| Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` — preflight + signed turns; unsigned requests are rejected with 401 (correct fail-closed behavior) | `curl .../health` |
-
-## Try it in 60 seconds
-
-```bash
-npm install
-npm run build
-npm run demo
-```
-
-```
-turn  1: us EXTRACT 10  | opp EXTRACT 5   | proof=proved-not-finalized | 1325ms | balances 100->105 / 100->95
-turn  2: us EXTRACT 10  | opp EXTRACT 5   | proof=proved-not-finalized | 626ms | balances 105->110 / 95->90
-turn  3: us EXTRACT 10  | opp EXTRACT 5   | proof=proved-not-finalized | 707ms | balances 110->115 / 90->85
-...
-Totals: 20/20 turns proved + locally verified, 12608ms total, avg 630ms/turn.
-Final balances: us 168 — opponent 28 → US WIN.
-```
-
-Defensive demo — the same commitment pattern, a different strategy
-(`[5,50,20,0,0,0,0,0]`, commitment `0x1b63…a2a24`):
-
-```bash
-npm run demo:defensive
-```
-
-Two 20-turn matches, one commitment. Scenario A (under attack) fires
-FORTIFY 9 times; scenario B (passive opponent) fires HOLD 4 times.
-Output (abridged):
-
-```
-Scenario A — under attack:
-turn 11: us EXTRACT 5  | opp EXTRACT 10  | proof=proved-not-finalized | 705ms | balances 50->45 / 150->155
-turn 12: us FORTIFY    | opp EXTRACT 5   | proof=proved-not-finalized | 703ms | balances 45->38 / 155->160
-...
-Totals: 20/20 turns proved + locally verified, 16280ms total, avg 814ms/turn.
-Actions: EXTRACT x11, FORTIFY x9, HOLD x0.
-Final balances: us 22 — opponent 160 → OPPONENT WIN.
-
-Scenario B — draining a passive opponent:
-turn 16: us EXTRACT 5  | opp HOLD        | proof=proved-not-finalized | 639ms | balances 175->180 / 25->20
-turn 17: us HOLD        | opp HOLD        | proof=proved-not-finalized | 801ms | balances 180->180 / 20->20
-...
-Totals: 20/20 turns proved + locally verified, 14066ms total, avg 703ms/turn.
-Actions: EXTRACT x16, FORTIFY x0, HOLD x4.
-Final balances: us 180 — opponent 20 → US WIN.
-
-DEFENSIVE DEMO OK: 40/40 turns proved + locally verified across both matches (EXTRACT x27, FORTIFY x9, HOLD x4).
-```
-
-Scenario A loses on points — that is the point: the defensive branch
-fires 9 times and every move is still proven. One 20-turn match cannot
-show both defensive branches (FORTIFY needs our balance to fall while
-HOLD needs theirs to fall), so the demo plays two matches under one
-commitment instead of faking it in one. The defensive salt lives in
-`.env.strategy-defensive` (gitignored, mode 0600) — never in the repo,
-never in the main `.env.strategy`.
-
-Then `npm run demo:refusal` to watch an illegal move fail (see above).
-
 ## The problem
-
-The enemy here is not a "bad agent" — it is **the unprovable agent**: a
-black-box agent holding keys to a treasury, where one move outside its
-mandate can drain funds and nobody can prove who is at fault.
 
 *Every agent move should be provably bound to the strategy its owner committed to — or it shouldn't move money.*
 
-It has already happened, in public: **Freysa (Nov 2024)** — an AI
-agent guarding a prize pool on Base, with one rule ("never transfer
-funds under any circumstances") — was talked into calling
-`approveTransfer` and sent the whole ~**$47,000** pool to a participant
-on the 482nd attempt (195 participants; reported by Cointelegraph and
-The Block, 29 Nov 2024). The agent was not hacked. It was persuaded.
-A rule written in a prompt is not a boundary — a boundary is something
-the agent *cannot* cross, even when it wants to. That is what a circuit
-is for.
+This is the **SECURITY** entry from the event's own inspiration list — a wallet & transaction guard — with the policy hidden by a Poseidon commitment and enforced by a Groth16 proof. It is the mirror image of the official example: instead of granting access when a proof shows a credential, this agent *acts* only when a proof shows the action is permitted by a committed policy.
 
-This is the **SECURITY** entry from the event's own inspiration list — a
-wallet & transaction guard — with the policy hidden by a Poseidon
-commitment and enforced by a Groth16 proof. It is the mirror image of the
-official example: instead of granting access when a proof shows a
-credential, this agent *acts* only when a proof shows the action is
-permitted by a committed policy.
+The pattern is established: Mandate (sponsor prize, ETHOnline 2026), MARS (1st, ETHGlobal New York 2026), Petri (ETHOnline 2026 finalist) and Identone (1st, cheqd Verifiable AI Hackathon 2025) all bound an agent's authority and put verification in front of every action. What this entry adds is enforcement with real cryptography: Groth16 proofs verified on zkVerify mainnet, in a live adversarial match — and the game is the hardest possible test of the pattern: an adversarial opponent, a public commitment, and a referee that cannot be bribed. Beyond the game, the same proof works for any agent whose actions must be provably bound to a policy — a trading bot capped at a loss limit, a governance agent bound to a voted mandate, a wallet guard bound to an allowlist.
 
-The pattern is established: Mandate (sponsor prize, ETHOnline 2026),
-MARS (1st, ETHGlobal New York 2026), Petri (ETHOnline 2026 finalist)
-and Identone (1st, cheqd Verifiable AI Hackathon 2025) all bound an
-agent's authority and put verification in front of every action. What
-this entry adds is enforcement with real cryptography: Groth16 proofs
-verified on zkVerify mainnet, in a live adversarial match — every move
-carries a proof that it stayed inside the policy the agent committed
-to before the match.
+**The validation slot is empty.** ERC-8004, the Ethereum "Trustless Agents" standard proposed in August 2025 (MetaMask, Ethereum Foundation, Google, Coinbase), defines three registries — Identity, Reputation, and Validation, where independent validators return a score plus proof that an agent did what it claims. Identity and Reputation are live on mainnet since January 2026, but the Validation Registry was pulled back for rework and is not in the official mainnet set. This entry fills that slot concretely: a validator that returns a ZK proof per move that the move stayed inside the committed strategy. (This is not a claim of ERC-8004 compliance — there is no real registration; it is an implementation of the validation slot the standard defines.)
 
-The game is the hardest possible test of the pattern: an adversarial
-opponent, a public commitment, and a referee that cannot be bribed — if
-the agent can be proven honest here, the same proof works for a trading
-limit or a treasury.
+## What is guaranteed, and what enforces it
 
-**Beyond the game:** the pattern is general — any agent whose actions must
-be provably bound to a policy it committed to before acting (a trading bot
-capped at a loss limit, a governance agent bound to a voted mandate, a
-wallet guard bound to an allowlist) can commit to its policy with a
-Poseidon hash and prove every action against the official circuit, without
-revealing the policy itself.
+Even with the agent's code, keys, salt and strategy in hand, an attacker can still only prove moves the committed policy allows. A fully compromised agent can extract at most 10 VFY per turn, and only when the committed strategy allows it — it cannot invent a move, change the strategy mid-match, or reuse a proof.
 
-**The validation slot is empty.** ERC-8004, the Ethereum "Trustless
-Agents" standard proposed in August 2025 (MetaMask, Ethereum Foundation,
-Google, Coinbase), defines three registries — Identity, Reputation, and
-Validation, where independent validators return a score plus proof that an
-agent did what it claims. Identity and Reputation are live on mainnet
-since January 2026, but the Validation Registry was pulled back for
-rework and is not in the official mainnet set. This entry fills that slot
-concretely: a validator that returns a ZK proof per move that the move
-stayed inside the committed strategy. (This is not a claim of ERC-8004
-compliance — there is no real registration; it is an implementation of
-the validation slot the standard defines.)
+zkVerify's own /build page puts it this way: *"A proof can verify perfectly and still authorize the wrong action. Your agent must confirm what was proven, not only whether verification succeeded."* ("Verification is necessary, not sufficient.") Before acting, this agent checks what the proof proves — the same seven checks the /build page requires:
+
+| Guarantee | Enforced by |
+|---|---|
+| A compromised agent can only prove moves the committed policy allows | Circuit asserts on the committed params and the strict decision list (FORTIFY → HOLD → EXTRACT); a move outside the list has no proof at all |
+| A proof cannot be reused for another turn | Public signals bind `matchId` + `turnNumber`; a platform retry returns the cached response via a deterministic idempotency key |
+| A forged commitment in the envelope is refused | Commitment-hash mismatch → HOLD with no proof |
+| A proof from a swapped circuit or key is never sent | Proofs are generated and self-verified against the official vfy-policy circuit (Groth16/bn128), VK `0x6c56…be047`; anything else fails local verification |
+| An expired task or forged signature is refused | HMAC verified on the raw body before JSON is parsed; an expired deadline fails closed to HOLD |
+| A failed proof means no move | The agent answers HOLD with no proof instead of guessing |
+| Every move is checkable by anyone — and the strategy stays secret | Each proof + public signals verify against the official circuit; proofs are submitted to Kurier and polled until Finalized before they count as on-chain evidence; the commitment is a public input to every proof, and only the Poseidon commitment is ever published — a judge shown the strategy can recompute it |
+| Every response is signed | `x-agent-games-signature` on every response |
 
 ## Why zkVerify — in numbers
 
@@ -470,72 +360,23 @@ simplest provable strategy; not a claim of a winning strategy.
 
 ## What's in this repo
 
-- `src/server.ts` — `GET /health`, `POST /agent` (preflight + turn).
-  HMAC is verified from the **raw body** before JSON is parsed; every
-  response is signed (`x-agent-games-signature`). At start, the VK is
-  registered with Kurier in the background (fire-and-forget, never crashes
-  the server), and the pinned SHA-256 hashes of the official circuit
-  artifacts are verified — a swapped circuit refuses to serve.
-  Prepared (tested locally, ships with the next deploy): `GET /agent`
-  (usage info), `GET /demo` (public demo summary), `POST /verify`
-  (verify any submitted proof against the official VK, no auth).
-- `src/turn.ts` — envelope validation, deadline check, commitment-hash
-  check, deterministic idempotency **UUIDv5-style from `matchId:turn`**
-  (a platform retry returns the same response; a new turn never reuses a
-  key), and **fail-safe to HOLD** on any error/uncertainty.
-  `action.amount` is **never** sent for HOLD/FORTIFY.
-- `src/strategy.ts` — the circuit's decision list (`decideActionFromParams`).
-- `src/strategyParams.ts` — params validation (rejects `[0]` outside 1–10,
-  `[3]` not 0/1, `[4..7]` not 0; all-zero params rejected).
-- `src/poseidon.ts` — Poseidon via circomlibjs, `computeCommitment`.
-- `src/circuitInputs.ts` — all **17 circuit inputs** wired
-  (9 scalars + `strategyParams[0..7]` + salt).
-- `src/proof.ts` — `generatePolicyProof()` (snarkjs fullProve + local
-  self-verify against the official verification key),
-  `registerKurierVk()`, `submitProofToKurier()`, `pollKurierJob()`
-  (correct endpoint: `GET /job-status/{KEY}/{jobId}`).
-- `src/store.ts` — persistent idempotency store: JSON file, atomic
-  write (tmp → rename). Used when `IDEMPOTENCY_STORE_PATH` is set.
-- `src/circuitArtifacts.ts` — pinned SHA-256 hashes of the official
-  `.wasm` + `.zkey`, verified at server startup.
-- `src/publicInputsHash.ts` — exactly per the official snippet (keccak256
-  over 8 fields, each 32 bytes big-endian).
-- `circuits/` — the **original** circuit files from the official site
-  (`vfy-policy.wasm`, `vfy-policy_final.zkey`, `circuit-info.json`).
-  vk_hash: `0x6c56509f1c56fd1fd4e9737f906d2220f4b95f1d507f1adf6899085bd74be047`
-- `scripts/commitment.cjs` — generates a fresh random salt, computes the
-  commitment, saves it to `.env.strategy` (mode 0600, gitignored, salt
-  **never printed**), then checks a proof for each reachable branch.
-- `scripts/demo-match.cjs` — simulates a 20-turn match against a scripted
-  opponent, real proof per turn, per-turn summary + totals. If
-  `KURIER_API_KEY` is set, submits ONE proof to Kurier.
-- `scripts/demo-match-defensive.cjs` — second demo: params
-  `[5,50,20,0,0,0,0,0]` under a separate commitment
-  (`.env.strategy-defensive`, never the main `.env.strategy`), two 20-turn
-  matches that fire FORTIFY (x9) and HOLD (x4) live
-  (`npm run demo:defensive`).
-- `scripts/demo-refusal.cjs` — the refusal demo: three out-of-policy moves
-  the circuit will not prove (over-cap, wrong-branch, replay), plus the agent failing closed to HOLD
-  (`npm run demo:refusal`).
-- `scripts/demo-treasury.cjs` — the treasury guard demo: the defensive
-  policy `[5,50,20,0,0,0,0,0]` as a treasury (spend cap 5, reserve
-  floor 50, counterparty floor 20) — spend 11 refused by the circuit,
-  spend 5 to an allowlisted address proved, spend 5 outside the
-  allowlist rejected by the guard layer (`npm run demo:treasury`).
-- `scripts/attack.cjs` — five attacks, all blocked: tampered commitment,
-  replay, strategy swap, forged proof, unsigned envelope
-  (`npm run attack`).
-- `scripts/export-proof.cjs` — exports one real turn-1 proof + the
-  official VK to `evidence/proof-turn-1/` (`npm run export:proof`);
-  verify it with zero repo code via `npm run verify:proof`.
-- `scripts/reveal-demo.cjs` — the reveal ceremony: opens the DEMO
-  (defensive) strategy — params + salt — and recomputes its commitment
-  (`npm run reveal:demo`). The MAIN salt is never revealed.
-- `evidence/` — committable proof artifacts: `proof-turn-1/` (real
-  turn-1 proof + public signals + official VK) and
-  `treasury-spend-5/` (real spend-5 proof under the treasury policy).
-- `scripts/probe-circuit-inputs.cjs` — circuit-input probing tool (used
-  during research; semantics solved, see `CIRCUIT_NOTES.md`).
+- `src/server.ts` + `src/turn.ts` — endpoint, raw-body HMAC, fail-closed HOLD, idempotency.
+- `src/proof.ts` + `src/circuitInputs.ts` — Groth16 prove + local self-verify vs the official VK; Kurier submit + poll.
+- `src/strategy.ts` + `src/poseidon.ts` — decision list + Poseidon commitment.
+- `scripts/demo*.cjs` — demo match, defensive, refusal, treasury, attack, reveal (`npm run demo*`).
+- `evidence/` — one real turn-1 proof + VK, verifiable with zero repo code (`npm run verify:proof`).
+- Full file list: browse `src/` and `scripts/`.
+
+## Where to look in the code
+
+| What | Where |
+|---|---|
+| Commitment check: envelope hash must match, else HOLD | `src/turn.ts:209-211` |
+| Circuit refuses a wrong move — `generatePolicyProof` throws, never returns an unverified proof | `src/proof.ts:75` (`fullProve`), `:84` (local `groth16.verify`) |
+| Replay returns the cached response, never a new proof | `src/turn.ts:103` (`deriveIdempotencyKey`, SHA-256 over `matchId:turn`) |
+| Kurier submit + poll until Finalized | `src/proof.ts:155` (`submitProofToKurier`), `:193` (`pollKurierJob`) |
+| Decision list FORTIFY → HOLD → EXTRACT | `src/strategy.ts:78-85` (`decideActionFromParams`) |
+| Pinned official circuit artifacts, SHA-256 verified at startup | `src/circuitArtifacts.ts:44` (`verifyCircuitArtifacts`; pins at `:27` and `:31`) |
 
 ## Run it / Deploy
 
