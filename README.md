@@ -370,24 +370,39 @@ real alternatives, not a default:
 | tiny-chess (Uton10/tiny-chess-agent) | That a chess move is bound to a pre-committed step (commit-then-reveal) | A custom circuit with a demo-grade setup; the proof binds the move, not whether the move is legal or the engine's output | A general pattern (commit-then-reveal) we borrow for the demo reveal; but its Kurier claim is a literal placeholder (`PROOF_REFERENCE`), it has no live demo and no tests |
 | Whale Sentinel (whale99999/agent-games-agent) | That a Steal move follows the same `[10,0,0,0,0,0,0,0]` strategy, official circuits for Gatekeeper + Steal | The agent's own code only — no Kurier, no demo page, no refusal demo, no write-up; tests use a dummy VK (`0xaaaa…`) | Same strategy, thinner evidence: this entry adds the Kurier pipeline, the refusal + attack demos, and the public demo page |
 
-### Head-to-head: this entry vs Sentinel Guard
+### How this differs from a proof-of-arithmetic guard
 
-Sentinel Guard ([markastrader/sentinel-guard](https://github.com/markastrader/sentinel-guard))
-is the strongest readable Wildcard competitor: a wallet & transaction
-guard with a live demo a judge can try in 30 seconds. This table states
-the differences factually — what each entry actually does — not as an
-attack. Links: Sentinel Guard repo, this repo.
+Some verifiable-agent entries prove arithmetic over flags their own server
+computed — a wallet guard, for example, scores a transaction from a set of
+checks and proves `score = weighted sum of flags`. The proof is real, but
+it proves the addition, not the facts: a compromised server can set all
+flags to 0 and still produce a valid "SAFE" proof, and a BLOCK verdict is
+only a label in the response — every input has a valid proof, including
+for a refusal. Nothing is actually refused.
 
-| | Sentinel Guard | This entry |
+This entry proves something else: that the move was permitted by the policy
+the owner committed to before acting. The circuit enforces the decision
+itself, so a wrong move has no proof at all — the refusal is cryptographic,
+not a label. The proof is also checked by a verifier the agent does not
+control (Kurier / zkVerify mainnet), the policy stays hidden behind a
+Poseidon commitment, and a failed proof means the move does not happen
+(fail-closed).
+
+| | Proof-of-arithmetic guard | This entry |
 |---|---|---|
-| What the proof proves | That `score = weighted sum of 10 flags` (arithmetic over flags the server computed outside the circuit) | That this move was permitted by the committed policy (the circuit enforces the decision list itself) |
-| Circuit | Custom `guard.circom`, trusted setup made locally by one contributor (public ceremony unreachable) | Official `vfy-policy` circuit, no setup of our own |
-| On-chain verification | None — proofs verified locally with snarkjs only | Submitted to Kurier / zkVerify mainnet; Gatekeeper jobs Finalized (three, 13 Nov); first Steal job id pending |
-| When proving fails | Verdict still returned with `proof: null` (best-effort) | Agent answers HOLD with no proof (fail-closed); the move does not happen |
-| BLOCK / refusal | BLOCK is a label in the JSON — every flag vector has a valid proof, including for BLOCK | Refusal is cryptographic: a wrong move has no proof at all (circuit assert), demonstrated live in `npm run demo:refusal` |
-| Policy privacy | All inputs public — the policy is visible | Policy hidden behind a Poseidon commitment; verifiable by recompute |
-| Judge can try it | Yes — live demo form (its strongest point; ~13.7s per request in our check) | Yes — public demo page + `npm run demo` + `npm run verify:proof` (one real proof, zero repo code) |
-| Live demo | Vercel form | GitHub Pages transcript + runnable scripts (interactive form prepared, ships with the next deploy) |
+| What the proof proves | That `score = weighted sum of flags` (arithmetic over inputs the server computed outside the circuit) | That this move was permitted by the committed policy (the circuit enforces the decision itself) |
+| Circuit | Usually custom, with a trusted setup made by its author | Official `vfy-policy` circuit, no setup of our own |
+| On-chain verification | Often none — proofs verified locally only | Submitted to Kurier / zkVerify mainnet; Gatekeeper jobs Finalized (three, 13 Nov); first Steal job id pending |
+| When proving fails | Verdict still returned, with no proof (best-effort) | Agent answers HOLD with no proof (fail-closed); the move does not happen |
+| Refusal | A label in the response — every input has a valid proof, including for a refusal | Cryptographic: a wrong move has no proof at all (circuit assert), demonstrated live in `npm run demo:refusal` |
+| Policy privacy | Usually all inputs public — the policy is visible | Policy hidden behind a Poseidon commitment; verifiable by recompute |
+| Judge can try it | A live demo form is the fastest way to show a guard | Public demo page + `npm run demo` + `npm run verify:proof` (one real proof, zero repo code) |
+
+The clearest example of the proof-of-arithmetic approach among readable
+Wildcard entries is Sentinel Guard ([markastrader/sentinel-guard](https://github.com/markastrader/sentinel-guard)) —
+a wallet & transaction guard with a live demo a judge can try in 30 seconds,
+which is genuinely its strongest point. The comparison above is about the
+approach, not the project.
 
 The spectrum, stated plainly: a TEE is proof by hardware, a bond/slashing
 scheme is proof by economics, multi-model consensus is proof by social
