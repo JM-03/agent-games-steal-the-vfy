@@ -34,7 +34,8 @@
     "dev": "tsx watch src/index.ts",
     "probe": "node scripts/probe-circuit-inputs.cjs",
     "start": "node dist/index.js",
-    "test": "AGENT_GAMES_HMAC_SECRET=test-secret-for-tests-only-123 STRATEGY_COMMITMENT_HASH=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa STRATEGY_PARAMS=[10,70,0,0,0,0,0,0] PROOF_ENABLED=false tsx --test --test-force-exit test/agent.test.ts"
+    "test": "AGENT_GAMES_HMAC_SECRET=test-secret-for-tests-only-123 STRATEGY_COMMITMENT_HASH=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa STRATEGY_PARAMS=[10,70,0,0,0,0,0,0] PROOF_ENABLED=false tsx --test --test-force-exit test/agent.test.ts",
+    "test:live": "AGENT_GAMES_HMAC_SECRET=test-secret-for-tests-only-123 tsx --test --test-force-exit test/live-endpoints.test.ts"
   },
   "type": "commonjs",
   "version": "1.0.0"
