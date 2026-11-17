@@ -21,4 +21,4 @@ The verification key is the same official key as the turn-1 proof:
   check (recipient is on the list) is a guard-layer check, not a
   circuit check, and is labelled as such on the demo page.
 - It does NOT prove on-chain finalization — that needs a Kurier job id
-  (first Steal job id still pending).
+  (the first Steal Finalized job id is 2d523ed8-e255-11f1-838e-1e6a0d14f999, 17 Nov 2026 — see the README's "Verified on mainnet" section).
