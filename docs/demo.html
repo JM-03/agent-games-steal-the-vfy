@@ -94,6 +94,8 @@
   .ctl label { display: flex; justify-content: space-between; font-size: 13px; color: var(--mute); margin-bottom: 8px; }
   .ctl label b { color: var(--ink); font-size: 14px; }
   .ctl input[type=range] { width: 100%; accent-color: var(--teal); }
+  .ctl input[type=number], .ctl input[type=text] { width: 100%; background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+  .ctl input[type=text] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: rgba(255,255,255,.02); flex-wrap: wrap; }
   .seg button { border: 0; background: transparent; color: var(--mute); padding: 6px 13px; border-radius: 999px; font-size: 13px; cursor: pointer; }
   .seg button[aria-pressed="true"] { background: rgba(255,255,255,.1); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
@@ -237,6 +239,17 @@
     <button class="choice card" onclick="showTreasury(3)" id="tbtn3" aria-pressed="false"><b>3 — Spend 5 VFY</b><span>To <code>0x9999…9999</code> — not on the allowlist.</span><span class="tag rejected">REJECTED</span></button>
   </div>
   <div class="card panel" id="treasuryPanel"></div>
+  <div class="card sim" style="padding:24px 28px;margin-top:18px">
+    <p style="margin:0 0 14px"><strong>Live check — ask the guard yourself.</strong> <span style="color:var(--mute)">Send a real spend request to the live guard (same committed policy [5, 50, 20]). Spends are fixed-size by commitment: only 5 proves. Try 11, or an address outside the allowlist, and watch it refuse.</span></p>
+    <div class="sim-controls">
+      <div class="ctl"><label>Amount to spend (VFY)</label><input type="number" id="trAmount" value="5" min="1" step="1"></div>
+      <div class="ctl"><label>Recipient (0x address)</label><input type="text" id="trRecipient" value="0x1111111111111111111111111111111111111111"></div>
+      <div class="ctl"><label>Treasury balance</label><input type="number" id="trSelf" value="100" min="0" step="1"></div>
+      <div class="ctl"><label>Counterparty balance</label><input type="number" id="trOpp" value="100" min="0" step="1"></div>
+    </div>
+    <div class="sim-row"><button class="pill solid" id="trBtn" onclick="checkTreasuryLive()">▶ Ask the treasury guard</button></div>
+    <div class="card panel" id="trPanel" style="margin-top:18px"><p style="margin:0;color:var(--mute)">Not asked yet.</p></div>
+  </div>
   <p class="sub" style="margin:16px 0 0; font-size:13px"><em>Precomputed demo — transcripts recorded 16 Nov 2026 from <code>npm run demo:treasury</code> (run it yourself for the live output). The verdicts are not live compute: this page shows what the script printed. The allowlist check is a guard-layer check, not a circuit check — the circuit knows balances and caps, not addresses.</em></p>
 </section>
 
@@ -252,6 +265,19 @@
   </div>
   <div class="card panel" id="rob-verdict"></div>
   <p class="sub" style="margin:16px 0 0; font-size:13px"><em>Honest label: this widget runs the agent's decision rule in your browser — the same list, same params, same commitment. It does <strong>not</strong> generate a Groth16 proof: proving needs the real circuit (snarkjs, ~1 s per proof). The full refusal run with real proofs is <code>npm run demo:refusal</code> — 3/3 out-of-policy moves refused by the circuit. Every verdict below matches that script's output exactly.</em></p>
+</section>
+
+<section class="block" id="live">
+  <p class="label">No key, no signature — ask the live agent</p>
+  <h2>One fresh proof, on demand</h2>
+  <p class="sub">The demo above is a recorded transcript. This button asks the live server for one real turn-1 proof right now — the same code path as a signed turn, minus the platform signature. The proof is generated live (~1 s) and you can check it yourself with <code>POST /verify</code>. If the endpoint has not picked up this update yet, the button says so — the recorded demo above runs the same code path.</p>
+  <div class="card sim" style="padding:24px 28px">
+    <div class="sim-row" style="margin:0">
+      <button class="pill solid" id="liveBtn" onclick="askLiveTurn()">▶ Ask the live agent for one real turn</button>
+      <span class="params-line">GET <code>https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn</code></span>
+    </div>
+    <div class="card panel" id="livePanel" style="margin-top:18px"><p style="margin:0;color:var(--mute)">Not asked yet. Turn 1, balances 100/100, committed strategy [10, 0, 0, 0, 0, 0, 0, 0] — expect EXTRACT 10 with a fresh Groth16 proof.</p></div>
+  </div>
 </section>
 
 <section class="block" id="verify">
@@ -404,7 +430,7 @@ MATCH — the revealed strategy is exactly the one committed to before the match
 <section class="block">
   <p class="label">On-chain evidence (Kurier)</p>
   <h2>Verified on zkVerify mainnet</h2>
-  <div class="note good"><strong>Status 17 Nov 2026: Finalized.</strong> A fresh demo run with the Kurier key set submitted the turn-1 proof (same demo, 20/20 proved, US WIN 168–28) — Kurier job <code>2d523ed8-e255-11f1-838e-1e6a0d14f999</code>, status <strong>Finalized</strong> on zkVerify mainnet. That job id is the Proof Reference in the Wildcard submission.</div>
+  <div class="note good"><strong>Status 17 Nov 2026: Finalized.</strong> A fresh demo run with the Kurier key set submitted the turn-1 proof (same demo, 20/20 proved, US WIN 168–28) — Kurier job <code>2d523ed8-e255-11f1-838e-1e6a0d14f999</code>, status <strong>Finalized</strong> on zkVerify mainnet. That job id is the Proof Reference in the Wildcard submission. On-chain: <a href="https://zkverify.subscan.io/extrinsic/0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b">Subscan extrinsic 0xf73f1c21…</a>. Public share: <a href="https://x.com/Jmartil1/status/2122677411565465703">X post, 17 Nov 2026</a> (demo video + repo link).</div>
   <p class="sub">Circuit vk_hash: <code>0x6c56509f1c56fd1fd4e9737f906d2220f4b95f1d507f1adf6899085bd74be047</code> (official <code>vfy-policy</code> circuit, Groth16/bn128, 9 public inputs).</p>
   <h2 style="margin-top:48px">How to read this page</h2>
   <p class="sub">This page is a transcript of real local runs of the repo's demo scripts, recorded <strong>15–17 Nov 2026</strong> (main + defensive matches on 15 Nov; refusal, treasury and reveal transcripts on 16 Nov; the Finalized Kurier job on 17 Nov). What is real: the turn handler (<code>src/turn.ts</code>), the Groth16 proofs (snarkjs + official <code>vfy-policy</code> circuit), and the local self-verification of every proof. What is simulated: the opponent (a fixed script) and the balance resolver (documented rules in the repo — FORTIFY costs 2 VFY and blocks up to 6 on the next turn; EXTRACT steals up to the requested amount; both sides' gains are computed from start-of-turn balances and applied together). The treasury examples are precomputed transcripts of <code>npm run demo:treasury</code> — the verdicts are what the script printed, labelled as such. The match is a local simulation, not a tournament game — the Steal tournament entries are locked, so this demo + proofs are the entry. The match simulator above uses the same decision list and resolver as the repo's demo — it just runs them in your browser instead of in Node.</p>
@@ -421,7 +447,10 @@ npm run demo:treasury  # treasury guard — 3 examples
 npm run attack         # five attacks, all must fail
 npm run verify:proof   # verify one real proof, zero repo code
 npm run reveal:demo    # reveal the DEMO strategy, recompute its commitment
-npm test               # 24/24 tests</pre>
+npm test               # 24/24 tests
+npm run test:live      # 11/11 live-endpoint tests
+curl https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn  # one fresh real proof, no key needed
+curl -X POST https://agent-games-steal-the-vfy-production.up.railway.app/treasury/check -H 'content-type: application/json' -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'  # ask the treasury guard</pre>
 </section>
 
 <footer>
@@ -655,6 +684,57 @@ function showRob(key) {
   document.getElementById("rob-verdict").innerHTML = out;
   var ids = { overcap: "rbtn-overcap", wrongbranch: "rbtn-wrongbranch", replay: "rbtn-replay", legal: "rbtn-legal" };
   for (var k in ids) document.getElementById(ids[k]).setAttribute("aria-pressed", k === key ? "true" : "false");
+}
+
+// ---- Live endpoints (public, no key) ----
+var ENDPOINT = "https://agent-games-steal-the-vfy-production.up.railway.app";
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function liveUnavailableHTML() {
+  return '<p><strong>The live endpoint has not picked up this update yet.</strong></p><p style="color:var(--mute)">The button above calls the live server — if it answers 404/503, the new routes are not deployed yet. The recorded demo above runs the same code path; try again after the next deploy.</p>';
+}
+async function askLiveTurn() {
+  var btn = document.getElementById("liveBtn");
+  var panel = document.getElementById("livePanel");
+  btn.disabled = true;
+  panel.innerHTML = '<p style="margin:0;color:var(--mute)">Asking the live agent — proving takes ~1 s…</p>';
+  try {
+    var r = await fetch(ENDPOINT + "/demo-turn");
+    var j = await r.json();
+    if (!r.ok || !j.ok) { panel.innerHTML = liveUnavailableHTML(); return; }
+    var sigs = j.publicSignals.map(function (s) { return esc(s.slice(0, 18)) + "…"; }).join("<br>");
+    panel.innerHTML = '<p><strong>Verdict: <span class="ok">PROVED LIVE</span></strong> — action <strong>' + esc(j.action.type) + (j.action.amount !== undefined ? " " + j.action.amount : "") + '</strong>, proof valid, ' + j.provingMs + ' ms to prove.</p>' +
+      '<p>Commitment <code>' + esc(j.commitment.slice(0, 12)) + '…</code> · vkHash <code>' + esc(j.vkHash.slice(0, 12)) + '…</code></p>' +
+      '<pre>publicSignals (9, truncated):\n' + sigs + '</pre>' +
+      '<p>Check it yourself: <code>POST /verify</code> with this proof + these public signals — or <code>npm run verify:proof</code> for the recorded turn-1 proof.</p>';
+  } catch (e) {
+    panel.innerHTML = liveUnavailableHTML();
+  } finally { btn.disabled = false; }
+}
+async function checkTreasuryLive() {
+  var btn = document.getElementById("trBtn");
+  var panel = document.getElementById("trPanel");
+  btn.disabled = true;
+  panel.innerHTML = '<p style="margin:0;color:var(--mute)">Asking the treasury guard…</p>';
+  var payload = {
+    amount: parseInt(document.getElementById("trAmount").value, 10),
+    recipient: document.getElementById("trRecipient").value.trim(),
+    selfBalance: parseInt(document.getElementById("trSelf").value, 10),
+    opponentBalance: parseInt(document.getElementById("trOpp").value, 10)
+  };
+  try {
+    var r = await fetch(ENDPOINT + "/treasury/check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    var j = await r.json();
+    if (r.status === 503 || r.status === 404) { panel.innerHTML = liveUnavailableHTML(); return; }
+    if (!r.ok || !j.ok) { panel.innerHTML = "<p><strong>Request rejected:</strong> " + esc(j.error || ("HTTP " + r.status)) + "</p>"; return; }
+    var cls = j.verdict === "SAFE" ? "ok" : "bad";
+    var html = '<p><strong>Verdict: <span class="' + cls + '">' + esc(j.verdict) + '</span></strong> (' + esc(j.layer) + ') — ' + esc(j.reason) + '</p>';
+    if (j.action) html += "<p>Action: <strong>" + esc(j.action.type) + (j.action.amount !== undefined ? " " + j.action.amount : "") + "</strong> · proof valid: " + (j.valid ? "yes" : "no") + "</p>";
+    if (j.circuitError) html += "<pre>" + esc(j.circuitError) + "</pre>";
+    if (j.valid) html += "<p>Check it yourself: <code>POST /verify</code> with this proof + public signals.</p>";
+    panel.innerHTML = html;
+  } catch (e) {
+    panel.innerHTML = liveUnavailableHTML();
+  } finally { btn.disabled = false; }
 }
 
 // ---- Init ----
