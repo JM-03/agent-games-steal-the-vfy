@@ -10,6 +10,7 @@ Agent TypeScript/Node untuk track **Steal the VFY** di zkVerify Agent Games (Wil
 | Verifikasi satu proof asli (tanpa kode repo) | `npm run verify:proof` — satu proof turn-1 lawan VK resmi (`evidence/proof-turn-1/`) |
 | Lihat agent mencoba curang | `npm run demo:refusal` — 3/3 langkah di luar policy ditolak circuit |
 | Tonton video demonya | [demo-video.mp4](docs/demo-video.mp4) — 84 dtk: match 20 turn 20/20 proved, US WIN 168–28, plus demo refusal 3/3 |
+| Public share (bonus) | [Postingan X, 17 Nov 2026](https://x.com/Jmartil1/status/2122677411565465703) — video demo + link repo, #AgentGames @ZKVProtocol |
 | Endpoint live | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` (401 tanpa signature = fail-closed) |
 | Write-up-nya | [`WRITEUP.md`](WRITEUP.md) — argumennya dalam 1.234 kata |
 
@@ -91,6 +92,10 @@ Setiap angka di halaman ini bisa direproduksi dengan satu command (`npm run demo
 | Kenapa zkVerify (biaya verifikasi) | ~272k gas per proof di Ethereum; sampai 90% lebih murah lewat zkVerify | Lihat "Kenapa zkVerify — dalam angka" |
 | Job Kurier Finalized (satu proof dari demo) | Finalized — job `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026, demo 20/20) | `npm run demo` dengan key diset |
 | Endpoint live | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` — preflight + turn bertanda tangan; request tanpa signature ditolak 401 (perilaku fail-closed yang benar) | `curl .../health` |
+| Proof live on demand | `GET /demo-turn` mengembalikan satu proof asli yang baru (turn 1, EXTRACT 10, self-verified) — tanpa key, tanpa signature | `curl https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn` |
+| Cek treasury | `POST /treasury/check` menjawab request spend asli dengan verdict + proof asli saat diizinkan (SAFE / REFUSED / REJECTED / HELD) | `curl -X POST .../treasury/check -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'` |
+| Status job Kurier | `GET /proof-status/<jobId>` membaca job Kurier lewat server (key tetap di server) | `curl .../proof-status/2d523ed8-e255-11f1-838e-1e6a0d14f999` |
+| Public share | Postingan X dengan video demo + link repo, #AgentGames @ZKVProtocol | [x.com/Jmartil1/status/2122677411565465703](https://x.com/Jmartil1/status/2122677411565465703) |
 
 ## Tes refusal — lihat agent mencoba curang dan gagal
 
@@ -178,6 +183,11 @@ Proof yang hanya diverifikasi oleh kode agent itu sendiri tidak membuktikan apa-
 Jalur submit-and-poll yang sama sudah mengembalikan job Finalized di ronde Gatekeeper live yang dinilai (tiga job, 13 Nov). Job Finalized pertama untuk Steal adalah `2d523ed8-e255-11f1-838e-1e6a0d14f999` — demo fresh 17 Nov 2026 (20/20, US WIN 168–28), dipoll sampai Finalized:
 `Kurier job submitted, jobId=2d523ed8-e255-11f1-838e-1e6a0d14f999, status=Submitted`
 `Kurier job 2d523ed8-e255-11f1-838e-1e6a0d14f999 final status: Finalized`
+
+On-chain: [Subscan extrinsic `0xf73f1c21…`](https://zkverify.subscan.io/extrinsic/0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b)
+(txHash `0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b`).
+Endpoint live melaporkan receipt yang sama di `GET /demo` (`kurier`) dan
+membaca job Kurier apa pun di `GET /proof-status/<jobId>`.
 
 **Server kami sendiri tidak pernah bisa menghasilkan VERIFIED — hanya Kurier / zkVerify mainnet yang bisa.** Itulah gunanya artefak proof yang di-commit: satu proof asli, diekspor supaya siapa pun bisa mengeceknya tanpa menjalankan satu baris pun kode repo ini — `npm run verify:proof` (lihat `evidence/proof-turn-1/README.md`).
 
@@ -302,13 +312,15 @@ npm start              # jalan di http://localhost:3000
 
 Cek kesehatan: `curl http://localhost:3000/health`
 
-Hasil terakhir (16 Nov 2026): **24 tes lolos, 0 gagal** — health, preflight bertanda tangan, penolakan signature salah/tanpa signature, turn valid (EXTRACT 10 + `publicInputsHash` yang cocok), replay `idempotencyKey` mengembalikan respons identik, key deterministik UUIDv5, FORTIFY/HOLD tanpa `amount`, deadline kedaluwarsa → HOLD, commitment hash tidak cocok → HOLD, aturan daftar keputusan circuit, 17 input ter-wire, params tidak valid ditolak, commitment cocok nilai golden dari probing circuit, proof EXTRACT/HOLD/FORTIFY yang prove + self-verify, aksi yang salah untuk state-nya **tidak bisa** dibuktikan (circuit assert menolak), GET /agent info pemakaian, GET /demo ringkasan, POST /verify menerima proof asli dan menolak yang dirusak, JSON store round-trip atomik dan tahan file corrupt, dan hash artefak circuit yang di-pin cocok dengan file di disk.
+Hasil terakhir (17 Nov 2026): **24 tes lolos, 0 gagal** — health, preflight bertanda tangan, penolakan signature salah/tanpa signature, turn valid (EXTRACT 10 + `publicInputsHash` yang cocok), replay `idempotencyKey` mengembalikan respons identik, key deterministik UUIDv5, FORTIFY/HOLD tanpa `amount`, deadline kedaluwarsa → HOLD, commitment hash tidak cocok → HOLD, aturan daftar keputusan circuit, 17 input ter-wire, params tidak valid ditolak, commitment cocok nilai golden dari probing circuit, proof EXTRACT/HOLD/FORTIFY yang prove + self-verify, aksi yang salah untuk state-nya **tidak bisa** dibuktikan (circuit assert menolak), GET /agent info pemakaian, GET /demo ringkasan, POST /verify menerima proof asli dan menolak yang dirusak, JSON store round-trip atomik dan tahan file corrupt, dan hash artefak circuit yang di-pin cocok dengan file di disk.
+
+Tes live-endpoint (`npm run test:live`): **11 lolos, 0 gagal** — GET /demo-turn mengembalikan satu proof asli yang baru (EXTRACT 10, self-verified, lalu diverifikasi ulang lewat POST /verify), POST /treasury/check menjawab request spend asli (SAFE dengan proof asli, REFUSED di atas cap dan untuk ukuran yang salah, REJECTED di luar allowlist, HELD dengan proof FORTIFY/HOLD di floor), bentuk GET /proof-status (400/503), dan preflight CORS (204).
 
 Waktu generate proof per turn (lokal): ~0,5–0,7 dtk steady-state (turn pertama ~1,3 dtk, cold start). Demo 20 turn: 20/20 proved + verified, total 12,6 dtk (rata-rata 630 mdtk/turn), skor akhir simulasi 168–28 (menang lawan opponent scripted).
 
 Catatan: `npm test` memakai `--test-force-exit` karena snarkjs meninggalkan worker MessagePort terbuka setelah `fullProve`, sehingga proses Node tidak keluar sendiri. Ini hanya soal test runner — server produksi memang jalan terus.
 
-**Deploy (Railway):** berbasis Dockerfile. Set Variables ini di Railway (isi nilai ASLI di Railway saja, jangan di chat): `AGENT_GAMES_HMAC_SECRET` (dari dashboard Agent Games), `KURIER_API_KEY` (API key mainnet Kurier), `STRATEGY_PARAMS` (`[10,0,0,0,0,0,0,0]`), `STRATEGY_SALT` (dari `.env.strategy`), `STRATEGY_COMMITMENT_HASH` (dari `.env.strategy` — `0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39` untuk params default + salt yang digenerate 14 Nov 2026), `CIRCUIT_VERSION=v1`, `PROOF_ENABLED=true`. Opsional: `IDEMPOTENCY_STORE_PATH` (mis. `/data/idempotency.json`) — hanya berguna di host dengan volume persisten; Railway tidak ada volume terpasang, jadi biarkan tidak diset di sana. Setelah ubah Variables, klik "Apply change" → Deploy — Railway tidak auto-deploy perubahan env var. Endpoint publik: `https://agent-games-steal-the-vfy-production.up.railway.app/agent` (daftarkan path handler lengkapnya).
+**Deploy (Railway):** berbasis Dockerfile. Set Variables ini di Railway (isi nilai ASLI di Railway saja, jangan di chat): `AGENT_GAMES_HMAC_SECRET` (dari dashboard Agent Games), `KURIER_API_KEY` (API key mainnet Kurier), `STRATEGY_PARAMS` (`[10,0,0,0,0,0,0,0]`), `STRATEGY_SALT` (dari `.env.strategy`), `STRATEGY_COMMITMENT_HASH` (dari `.env.strategy` — `0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39` untuk params default + salt yang digenerate 14 Nov 2026), `CIRCUIT_VERSION=v1`, `PROOF_ENABLED=true`. Untuk treasury guard (`POST /treasury/check`): `STRATEGY_PARAMS_DEFENSIVE` (`[5,50,20,0,0,0,0,0]`), `STRATEGY_SALT_DEFENSIVE` dan `STRATEGY_COMMITMENT_DEFENSIVE` (dari `.env.strategy-defensive` — commitment `0x1b633a5a1e59fadd82344fc383f6aef95d6b043d46f4fe87235bfc99d88a2a24`); opsional `TREASURY_ALLOWLIST` (daftar 0x address dipisah koma; default dua alamat demo). Tanpa tiga variabel defensive, route treasury menjawab 503 dan sisanya tetap jalan. Opsional: `IDEMPOTENCY_STORE_PATH` (mis. `/data/idempotency.json`) — hanya berguna di host dengan volume persisten; Railway tidak ada volume terpasang, jadi biarkan tidak diset di sana. Setelah ubah Variables, klik "Apply change" → Deploy — Railway tidak auto-deploy perubahan env var. Endpoint publik: `https://agent-games-steal-the-vfy-production.up.railway.app/agent` (daftarkan path handler lengkapnya).
 
 ## Batasan yang jujur
 
@@ -333,3 +345,5 @@ Catatan: `npm test` memakai `--test-force-exit` karena snarkjs meninggalkan work
 - Circuit vk_hash: `0x6c56509f1c56fd1fd4e9737f906d2220f4b95f1d507f1adf6899085bd74be047`
 - Commitment (params `[10,0,0,0,0,0,0,0]`): `0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39`
 - Kurier job id (satu proof dari demo, Finalized 17 Nov 2026): `2d523ed8-e255-11f1-838e-1e6a0d14f999`
+- On-chain: [Subscan extrinsic](https://zkverify.subscan.io/extrinsic/0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b) (txHash `0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b`)
+- Public share: [Postingan X, 17 Nov 2026](https://x.com/Jmartil1/status/2122677411565465703) (video demo + link repo, #AgentGames @ZKVProtocol)

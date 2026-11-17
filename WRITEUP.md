@@ -139,6 +139,18 @@ it knows balances and caps, not addresses — so the allowlist lives in
 the guard layer and is labelled as such. What generalizes is the pattern
 (commit once, prove every move, reveal after), not the circuit.
 
+The guard also answers live: `POST /treasury/check` takes a real spend
+request (`{ amount, recipient, selfBalance, opponentBalance }`) and
+returns a verdict from the committed policy — SAFE with a real Groth16
+proof when the spend is allowed, REFUSED by the circuit when it is over
+the cap (the endpoint actually asks the circuit and reports the
+refusal), REJECTED by the allowlist when the recipient is unknown, HELD
+with a FORTIFY/HOLD proof when a floor is hit. Spends are fixed-size by
+commitment: the policy spends exactly 5 per move, so asking for 3 or 11
+has no proof — a different size needs a new commitment, which is the
+point: the size is committed, not chosen at spend time. Try it from the
+demo page, or with curl (see "Verify it yourself" below).
+
 ## Why ZK, and not the alternatives
 
 There is more than one way to make an agent checkable, and the choice
@@ -169,9 +181,10 @@ itself.
   with persistent disk.
 - A refused move produces no proof, so no Kurier receipt exists for a
   refusal — the demo output is the evidence.
-- The Kurier job id for a Steal proof is still pending (it needs a demo
-  run with the key set); the pipeline itself is proven — the same setup
-  has already had Gatekeeper proofs Finalized on mainnet.
+- The first Steal Kurier job is Finalized: `2d523ed8-e255-11f1-838e-1e6a0d14f999`
+  (17 Nov 2026), on-chain at
+  https://zkverify.subscan.io/extrinsic/0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b.
+  The same setup had already had Gatekeeper proofs Finalized on mainnet.
 
 ## Verify it yourself
 
@@ -188,7 +201,26 @@ npm run attack         # five attacks, all must fail
 npm run verify:proof   # verify one real proof, zero repo code
 npm run reveal:demo    # reveal the DEMO strategy, recompute its commitment
 npm test               # 24/24 tests
+npm run test:live      # 11/11 live-endpoint tests
 ```
+
+No key or signature needed to try the live agent:
+
+```bash
+# One fresh real proof from the live server (turn 1, EXTRACT 10)
+curl https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn
+
+# Ask the treasury guard about your own spend request
+curl -X POST https://agent-games-steal-the-vfy-production.up.railway.app/treasury/check \
+  -H 'content-type: application/json' \
+  -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'
+
+# Read the Kurier job behind the demo proof
+curl https://agent-games-steal-the-vfy-production.up.railway.app/proof-status/2d523ed8-e255-11f1-838e-1e6a0d14f999
+```
+
+Public share: [X post, 17 Nov 2026](https://x.com/Jmartil1/status/2122677411565465703)
+(demo video + repo link, #AgentGames @ZKVProtocol).
 
 No account, no key, no platform needed to reproduce any of it. The full
 transcript — every turn, every refusal — is on the public demo page:

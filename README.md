@@ -11,6 +11,7 @@ Games (Wildcard). Built by Gogo Maduro (`@jmartil1`, GitHub `JM-03`) with jink. 
 | Verify one real proof (no repo code) | `npm run verify:proof` — one turn-1 proof vs the official VK (`evidence/proof-turn-1/`) |
 | Watch it try to cheat | `npm run demo:refusal` — 3/3 out-of-policy moves refused by the circuit |
 | Watch the demo video | [demo-video.mp4](docs/demo-video.mp4) — 84 s: 20-turn match 20/20 proved, US WIN 168–28, plus the 3/3 refusal demo |
+| Public share (bonus) | [X post, 17 Nov 2026](https://x.com/Jmartil1/status/2122677411565465703) — demo video + repo link, #AgentGames @ZKVProtocol |
 | Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` (401 without signature = fail-closed) |
 | The write-up | [`WRITEUP.md`](WRITEUP.md) — the argument in 1,234 words |
 
@@ -100,6 +101,10 @@ Every number on this page is reproducible with one command (`npm run demo` / `np
 | Why zkVerify (verification cost) | ~272k gas per proof on Ethereum; up to 90% less via zkVerify | See "Why zkVerify — in numbers" |
 | Kurier Finalized job (one proof from the demo) | Finalized — job `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026, demo 20/20) | `npm run demo` with the key set |
 | Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` — preflight + signed turns; unsigned requests are rejected with 401 (correct fail-closed behavior) | `curl .../health` |
+| Live proof on demand | `GET /demo-turn` returns one fresh real proof (turn 1, EXTRACT 10, self-verified) — no key, no signature needed | `curl https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn` |
+| Treasury check | `POST /treasury/check` answers a real spend request with a verdict + a real proof when allowed (SAFE / REFUSED / REJECTED / HELD) | `curl -X POST .../treasury/check -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'` |
+| Kurier job status | `GET /proof-status/<jobId>` reads a Kurier job through the server (key stays server-side) | `curl .../proof-status/2d523ed8-e255-11f1-838e-1e6a0d14f999` |
+| Public share | X post with the demo video + repo link, #AgentGames @ZKVProtocol | [x.com/Jmartil1/status/2122677411565465703](https://x.com/Jmartil1/status/2122677411565465703) |
 
 ## The refusal test — watch the agent try to cheat and fail
 
@@ -210,6 +215,11 @@ Finalized job id is `2d523ed8-e255-11f1-838e-1e6a0d14f999` — demo fresh
 17 Nov 2026 (20/20, US WIN 168–28), polled until Finalized:
 `Kurier job submitted, jobId=2d523ed8-e255-11f1-838e-1e6a0d14f999, status=Submitted`
 `Kurier job 2d523ed8-e255-11f1-838e-1e6a0d14f999 final status: Finalized`
+
+On-chain: [Subscan extrinsic `0xf73f1c21…`](https://zkverify.subscan.io/extrinsic/0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b)
+(txHash `0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b`).
+The live endpoint reports the same receipt at `GET /demo` (`kurier`) and
+reads any Kurier job at `GET /proof-status/<jobId>`.
 
 **Our server alone can never produce VERIFIED — only Kurier / zkVerify
 mainnet can.** That is the point of the committed proof artifacts: one
@@ -368,7 +378,7 @@ simplest provable strategy; not a claim of a winning strategy.
 
 ## What's in this repo
 
-- `src/server.ts` + `src/turn.ts` — endpoint, raw-body HMAC, fail-closed HOLD, idempotency.
+- `src/server.ts` + `src/turn.ts` — endpoint (incl. public GET /demo-turn, GET /proof-status, POST /treasury/check), raw-body HMAC, fail-closed HOLD, idempotency.
 - `src/proof.ts` + `src/circuitInputs.ts` — Groth16 prove + local self-verify vs the official VK; Kurier submit + poll.
 - `src/strategy.ts` + `src/poseidon.ts` — decision list + Poseidon commitment.
 - `scripts/demo*.cjs` — demo match, defensive, refusal, treasury, attack, reveal (`npm run demo*`).
@@ -406,7 +416,7 @@ npm start              # runs at http://localhost:3000
 
 Health check: `curl http://localhost:3000/health`
 
-Latest results (16 Nov 2026): **24 tests pass, 0 fail** — health, signed
+Latest results (17 Nov 2026): **24 tests pass, 0 fail** — health, signed
 preflight, rejection of bad/unsigned signatures, valid turn (EXTRACT 10 +
 matching `publicInputsHash`), replayed `idempotencyKey` returning an
 identical response, deterministic UUIDv5 key, FORTIFY/HOLD without
@@ -419,6 +429,14 @@ GET /demo summary, POST /verify accepting a real proof and rejecting a
 tampered one, the JSON store round-tripping atomically and tolerating a
 corrupt file, and the pinned circuit-artifact hashes matching the files
 on disk.
+
+Live-endpoint tests (`npm run test:live`): **11 pass, 0 fail** — GET
+/demo-turn returning one fresh real proof (EXTRACT 10, self-verified,
+then re-verified through POST /verify), POST /treasury/check answering
+real spend requests (SAFE with a real proof, REFUSED over the cap and
+for the wrong size, REJECTED outside the allowlist, HELD with
+FORTIFY/HOLD proofs at the floors), GET /proof-status shapes (400/503),
+and CORS preflight (204).
 
 Proof generation per turn (local): ~0.5–0.7s steady-state (first turn
 ~1.3s, cold start). Demo 20 turns: 20/20 proved + verified, 12.6s total
@@ -438,6 +456,13 @@ continuously by design.
 `0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39`
 for the default params + the salt generated 14 Nov 2026),
 `CIRCUIT_VERSION=v1`, `PROOF_ENABLED=true`.
+For the treasury guard (`POST /treasury/check`): `STRATEGY_PARAMS_DEFENSIVE`
+(`[5,50,20,0,0,0,0,0]`), `STRATEGY_SALT_DEFENSIVE` and
+`STRATEGY_COMMITMENT_DEFENSIVE` (from `.env.strategy-defensive` —
+commitment `0x1b633a5a1e59fadd82344fc383f6aef95d6b043d46f4fe87235bfc99d88a2a24`);
+optional `TREASURY_ALLOWLIST` (comma-separated 0x addresses; default the
+two demo addresses). Without the three defensive variables the treasury
+route answers 503 and everything else still works.
 Optional: `IDEMPOTENCY_STORE_PATH` (e.g. `/data/idempotency.json`) —
 only useful on a host with a persistent volume; Railway has none
 attached, so leave it unset there.
@@ -486,3 +511,5 @@ Public endpoint: `https://agent-games-steal-the-vfy-production.up.railway.app/ag
 - Circuit vk_hash: `0x6c56509f1c56fd1fd4e9737f906d2220f4b95f1d507f1adf6899085bd74be047`
 - Commitment (params `[10,0,0,0,0,0,0,0]`): `0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39`
 - Kurier job id (one proof from the demo, Finalized 17 Nov 2026): `2d523ed8-e255-11f1-838e-1e6a0d14f999`
+- On-chain: [Subscan extrinsic](https://zkverify.subscan.io/extrinsic/0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b) (txHash `0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b`)
+- Public share: [X post, 17 Nov 2026](https://x.com/Jmartil1/status/2122677411565465703) (demo video + repo link, #AgentGames @ZKVProtocol)
