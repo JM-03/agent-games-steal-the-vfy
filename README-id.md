@@ -1,6 +1,6 @@
 # Steal the VFY — Agent untuk zkVerify Agent Games (Wildcard)
 
-Agent TypeScript/Node untuk track **Steal the VFY**. Akun Elgi: `@jmartil1`,
+Agent TypeScript/Node untuk track **Steal the VFY**. Akun Gogo Maduro: `@jmartil1`,
 GitHub `JM-03`.
 
 > **STATUS — 14 Nov 2026.** Proof pipeline **sudah jalan penuh**: semua 17
@@ -140,7 +140,7 @@ meninggalkan worker MessagePort terbuka setelah `fullProve`, sehingga
 proses Node tidak keluar sendiri. Ini hanya soal test runner — server
 produksi memang jalan terus.
 
-## Deploy ke Railway + daftar Wildcard (langkah Elgi)
+## Deploy ke Railway + daftar Wildcard (langkah Gogo Maduro)
 
 1. **Upload repo ke GitHub** (akun `JM-03`), pakai isi folder ini
    (jangan upload `.env` / `.env.strategy` — sudah di `.gitignore`).
