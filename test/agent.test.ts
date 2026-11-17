@@ -420,7 +420,10 @@ test("GET /demo returns the public demo summary", async () => {
   const results = json.results as Record<string, string>;
   assert.match(results.demoMatch, /20\/20/);
   assert.match(results.refusalDemo, /3\/3/);
-  assert.equal(json.kurierStealJobId, null);
+  assert.equal(json.kurierStealJobId, "2d523ed8-e255-11f1-838e-1e6a0d14f999");
+  const kurier = json.kurier as Record<string, string>;
+  assert.equal(kurier.status, "Finalized");
+  assert.match(kurier.explorer, /zkverify\.subscan\.io\/extrinsic\/0xf73f1c21/);
 });
 
 test("POST /verify verifies a real proof and rejects a tampered one", async () => {
