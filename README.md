@@ -1,7 +1,7 @@
 # Steal the VFY — every move provably bound to a pre-committed strategy
 
 A TypeScript/Node agent for the **Steal the VFY** track of zkVerify Agent
-Games (Wildcard). Built by Elgi (`@jmartil1`, GitHub `JM-03`) with jink. Indonesian version: [`README-id.md`](README-id.md).
+Games (Wildcard). Built by Gogo Maduro(`@jmartil1`, GitHub `JM-03`) with jink. Indonesian version: [`README-id.md`](README-id.md).
 
 **Commit once, prove every move.**
 
@@ -10,6 +10,7 @@ Games (Wildcard). Built by Elgi (`@jmartil1`, GitHub `JM-03`) with jink. Indones
 | Try the demo (no install) | [demo page](https://jm-03.github.io/agent-games-steal-the-vfy/demo.html) — try to cheat it yourself, 20-turn replay, treasury guard, refusal demo |
 | Verify one real proof (no repo code) | `npm run verify:proof` — one turn-1 proof vs the official VK (`evidence/proof-turn-1/`) |
 | Watch it try to cheat | `npm run demo:refusal` — 3/3 out-of-policy moves refused by the circuit |
+| Watch the demo video | [demo-video.mp4](docs/demo-video.mp4) — 84 s, no voiceover: 20-turn match 20/20 proved, US WIN 168–28, plus the 3/3 refusal demo |
 | Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` (401 without signature = fail-closed) |
 | The write-up | [`WRITEUP.md`](WRITEUP.md) — the argument in 1,234 words |
 
@@ -25,7 +26,7 @@ Games (Wildcard). Built by Elgi (`@jmartil1`, GitHub `JM-03`) with jink. Indones
 ## Status
 
 Shipped: proof pipeline (17/17 inputs, Groth16 per turn, self-verified), demo 20/20, defensive 40/40, refusal 3/3, attack script 5/5, 24/24 tests, public demo page.
-Not yet: first Steal Kurier Finalized job id (pending the env-var session); demo video.
+Not yet: first Steal Kurier Finalized job id (pending the env-var session)
 Tournament: Steal entries locked — this is a Wildcard demo, not a tournament entry.
 
 The enemy here is not a "bad agent" — it is **the unprovable agent**: a black-box agent holding keys to a treasury, where one move outside its mandate can drain funds and nobody can prove who is at fault.
@@ -77,12 +78,17 @@ never in the main `.env.strategy`.
 
 Then `npm run demo:refusal` to watch an illegal move fail (see below).
 
+Or watch the 84-second demo video (no voiceover):
+
+<video src="docs/demo-video.mp4" controls width="100%"></video>
+
 ## Evidence
 
 Every number on this page is reproducible with one command (`npm run demo` / `npm test`).
 
 | Check | Result | How to verify |
 |---|---|---|
+| Demo video (84 s, no voiceover) | 20-turn match 20/20 proved, US WIN 168–28, plus the 3/3 refusal demo | [docs/demo-video.mp4](docs/demo-video.mp4) |
 | Demo match (20 turns, real proofs) | 20/20 proved + locally verified, ~13s, final 168–28 | `npm run demo` |
 | Refusal demo (3 out-of-policy moves) | 3/3 refused by the circuit; agent answered HOLD | `npm run demo:refusal` |
 | Defensive demo (FORTIFY + HOLD live) | 40/40 proved + locally verified; FORTIFY x9, HOLD x4 | `npm run demo:defensive` |
