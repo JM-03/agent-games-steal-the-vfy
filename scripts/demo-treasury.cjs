@@ -141,7 +141,7 @@ async function main() {
           `  check (recipient is on the list) is a guard-layer check, not a\n` +
           `  circuit check, and is labelled as such on the demo page.\n` +
           `- It does NOT prove on-chain finalization — that needs a Kurier job id\n` +
-          `  (first Steal job id still pending).\n`,
+          `  (the first Steal Finalized job id is 2d523ed8-e255-11f1-838e-1e6a0d14f999, 17 Nov 2026 — see the README's "Verified on mainnet" section).\n`,
       );
       console.log("  Proof exported to evidence/treasury-spend-5/ (verify with: npm run verify:treasury)");
     } catch (e) {
