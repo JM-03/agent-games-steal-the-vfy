@@ -28,14 +28,29 @@
 //   - Every response carries x-agent-games-signature over its raw body.
 //   - No secrets are ever logged.
 import express from "express";
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import * as snarkjs from "snarkjs";
 import { assertConfigForServing, config } from "./config";
 import { SIGNATURE_HEADER, signBody, verifySignature } from "./hmac";
 import { handleTurn, isIdempotencyPersistent } from "./turn";
-import { exportVerificationKey, registerKurierVk } from "./proof";
+import {
+  exportVerificationKey,
+  generatePolicyProof,
+  getKurierJobStatus,
+  registerKurierVk,
+} from "./proof";
+import { decideAction, decideActionFromParams, toStrategyContext } from "./strategy";
 import { verifyCircuitArtifacts } from "./circuitArtifacts";
 import type { PreflightRequest, TurnEnvelope } from "./types";
+
+/** One proof from the 17 Nov 2026 demo (20/20, US WIN 168–28), submitted
+ * via Kurier and polled until Finalized. Public facts — the job id is the
+ * Proof Reference in the Wildcard submission. */
+export const KURIER_STEAL_JOB_ID = "2d523ed8-e255-11f1-838e-1e6a0d14f999";
+export const KURIER_STEAL_TX_HASH =
+  "0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b";
+export const KURIER_STEAL_EXPLORER =
+  "https://zkverify.subscan.io/extrinsic/0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b";
 
 /** Public demo summary — the same numbers as the README Evidence table. */
 export const DEMO_SUMMARY = {
@@ -51,7 +66,15 @@ export const DEMO_SUMMARY = {
     attackScript: "5/5 attacks blocked",
     tests: "24/24 pass",
   },
-  kurierStealJobId: null,
+  kurierStealJobId: KURIER_STEAL_JOB_ID,
+  kurier: {
+    jobId: KURIER_STEAL_JOB_ID,
+    status: "Finalized",
+    txHash: KURIER_STEAL_TX_HASH,
+    explorer: KURIER_STEAL_EXPLORER,
+    vkHash: config.vkHash,
+    note: "One turn-1 proof from the 17 Nov 2026 demo (20/20, US WIN 168–28), submitted via Kurier and polled until Finalized.",
+  },
   links: {
     repo: "https://github.com/JM-03/agent-games-steal-the-vfy",
     demoPage: "https://jm-03.github.io/agent-games-steal-the-vfy/demo.html",
@@ -62,6 +85,18 @@ export const DEMO_SUMMARY = {
 
 export function createApp() {
   const app = express();
+
+  // Public demo API: allow any origin to call the read-only routes from
+  // the GitHub Pages demo (and from a judge's browser). CORS only
+  // controls browsers, not auth — HMAC enforcement for POST /agent
+  // below is unchanged.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    res.setHeader("access-control-allow-origin", "*");
+    res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+    res.setHeader("access-control-allow-headers", "content-type, x-agent-games-signature");
+    if (req.method === "OPTIONS") return res.status(204).end();
+    return next();
+  });
 
   // Capture the raw body for HMAC verification (must run before parsing).
   app.use(
@@ -113,6 +148,282 @@ export function createApp() {
   // Public, read-only demo summary (no secrets — commitment is public).
   app.get("/demo", (_req: Request, res: Response) => {
     res.status(200).json(DEMO_SUMMARY);
+  });
+
+  // Public, read-only live proof on demand: one REAL turn-1 proof of the
+  // recorded demo (balances 100/100, committed strategy), generated live
+  // by this server — the same code path as POST /agent turns, without
+  // needing the platform HMAC secret. No state change, no Kurier
+  // submission: this endpoint proves, it does not publish. The on-chain
+  // receipt for a demo proof is in GET /demo (kurier).
+  app.get("/demo-turn", async (_req: Request, res: Response) => {
+    if (!config.proofEnabled) {
+      return res.status(503).json({
+        ok: false,
+        error: "proof generation is disabled on this deployment (PROOF_ENABLED=false)",
+      });
+    }
+    if (!config.strategySalt || !config.strategyCommitmentHash) {
+      return res.status(503).json({
+        ok: false,
+        error:
+          "this deployment has no committed strategy configured " +
+          "(STRATEGY_SALT / STRATEGY_COMMITMENT_HASH not set)",
+      });
+    }
+    const t0 = Date.now();
+    try {
+      const envelope: TurnEnvelope = {
+        protocolVersion: "v1",
+        eventId: "steal-the-vfy",
+        matchId: "52345678-5234-5234-5234-523456789abc",
+        turn: 1,
+        issuedAt: new Date().toISOString(),
+        deadlineAt: new Date(Date.now() + 25_000).toISOString(),
+        state: {
+          selfBalance: 100,
+          opponentBalance: 100,
+          selfFortifiedUntilTurn: null,
+          opponentFortifiedUntilTurn: null,
+        },
+        strategyCommitment: { hash: config.strategyCommitmentHash },
+      };
+      const action = decideAction(toStrategyContext(1, envelope.state));
+      const { proof, publicSignals } = await generatePolicyProof(envelope, action);
+      return res.status(200).json({
+        ok: true,
+        demo: "Turn 1 of the recorded 20-turn demo (balances 100/100, committed strategy).",
+        matchId: envelope.matchId,
+        turn: 1,
+        action,
+        commitment: config.strategyCommitmentHash,
+        vkHash: config.vkHash,
+        proof,
+        publicSignals,
+        valid: true,
+        provingMs: Date.now() - t0,
+        verifyWith: "POST /verify with { proof, publicSignals } — or npm run verify:proof for the recorded turn-1 proof.",
+        note: "This endpoint proves, it does not publish: no proof is submitted to Kurier here.",
+      });
+    } catch (e) {
+      return res.status(503).json({
+        ok: false,
+        error: `live proof generation failed: ${(e as Error).message}`,
+      });
+    }
+  });
+
+  // Public, read-only Kurier job status (the same receipt the demo page
+  // links to). The Kurier API key stays server-side; only the jobId the
+  // caller asks about is ever sent to Kurier.
+  app.get("/proof-status/:jobId", async (req: Request, res: Response) => {
+    const jobId = String(req.params.jobId ?? "");
+    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(jobId)) {
+      return res.status(400).json({ ok: false, error: "jobId must be a Kurier job UUID" });
+    }
+    if (!config.kurierApiKey) {
+      return res.status(503).json({
+        ok: false,
+        jobId,
+        error:
+          "Kurier is not configured on this deployment (KURIER_API_KEY not set). " +
+          "Check the job at the Subscan link in GET /demo instead.",
+      });
+    }
+    try {
+      const status = await getKurierJobStatus(jobId);
+      return res.status(200).json({
+        ok: true,
+        jobId,
+        status: status.status ?? null,
+        proofReference: status.proofReference ?? null,
+        raw: status.raw,
+      });
+    } catch (e) {
+      return res.status(502).json({ ok: false, jobId, error: (e as Error).message });
+    }
+  });
+
+  // Public treasury-guard check: ask the guard about a REAL spend
+  // request — { amount, recipient, selfBalance, opponentBalance } — and
+  // get a verdict from the live committed policy, with a real Groth16
+  // proof when the spend is allowed. No HMAC, no state change, no Kurier
+  // submission: this is a check, not a match turn (fixed demo matchId,
+  // turn 1, fresh evaluation per call).
+  //
+  // The policy is the DEFENSIVE strategy [5,50,20,0,0,0,0,0] under its
+  // own commitment: spend exactly params[0] (5) per move, reserve floor
+  // 50, counterparty floor 20. Spends are FIXED-SIZE by commitment — a
+  // different size needs a new commitment (a new policy), so asking for
+  // any amount other than 5 is refused by the circuit itself, and the
+  // refusal is demonstrated by actually asking the circuit.
+  app.post("/treasury/check", async (req: Request, res: Response) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const amount = body.amount;
+    const recipient = typeof body.recipient === "string" ? body.recipient.trim().toLowerCase() : "";
+    const selfBalance = body.selfBalance === undefined ? 100 : body.selfBalance;
+    const opponentBalance = body.opponentBalance === undefined ? 100 : body.opponentBalance;
+    if (typeof amount !== "number" || !Number.isInteger(amount) || amount < 1) {
+      return res.status(400).json({
+        ok: false,
+        error: "body.amount must be a positive integer (the spend being requested, in VFY)",
+      });
+    }
+    if (!/^0x[0-9a-f]{40}$/.test(recipient)) {
+      return res.status(400).json({
+        ok: false,
+        error: "body.recipient must be a 0x address (40 hex chars)",
+      });
+    }
+    if (
+      typeof selfBalance !== "number" ||
+      !Number.isInteger(selfBalance) ||
+      selfBalance < 0 ||
+      selfBalance > 100000 ||
+      typeof opponentBalance !== "number" ||
+      !Number.isInteger(opponentBalance) ||
+      opponentBalance < 0 ||
+      opponentBalance > 100000
+    ) {
+      return res.status(400).json({
+        ok: false,
+        error: "body.selfBalance / body.opponentBalance must be integers 0..100000",
+      });
+    }
+    if (!config.treasuryParams || !config.treasurySalt || !config.treasuryCommitment) {
+      return res.status(503).json({
+        ok: false,
+        error:
+          "the treasury guard is not configured on this deployment " +
+          "(STRATEGY_PARAMS_DEFENSIVE / STRATEGY_SALT_DEFENSIVE / " +
+          "STRATEGY_COMMITMENT_DEFENSIVE not set); the recorded transcript " +
+          "is on the demo page and in npm run demo:treasury",
+      });
+    }
+    const params = config.treasuryParams;
+    const policy = {
+      params,
+      commitment: config.treasuryCommitment,
+      spendCap: params[0],
+      reserveFloor: params[1],
+      counterpartyFloor: params[2],
+      note: "Spends are fixed-size by commitment: the policy spends exactly params[0] per move. A different size needs a new commitment (a new policy).",
+    };
+    const base = {
+      policy,
+      recipient,
+      amount,
+      selfBalance,
+      opponentBalance,
+      verifyWith: "POST /verify with { proof, publicSignals }",
+    };
+    // 1. Guard layer first: the circuit never hears about an address
+    //    outside the allowlist.
+    if (!config.treasuryAllowlist.includes(recipient)) {
+      return res.status(200).json({
+        ok: true,
+        verdict: "REJECTED",
+        layer: "guard",
+        reason: "recipient is not on the allowlist — the circuit was never asked",
+        action: null,
+        proof: null,
+        publicSignals: null,
+        valid: false,
+        ...base,
+      });
+    }
+    // 2. The committed decision list, for the balances given.
+    const ctx = toStrategyContext(1, {
+      selfBalance,
+      opponentBalance,
+      selfFortifiedUntilTurn: null,
+      opponentFortifiedUntilTurn: null,
+    });
+    const action = decideActionFromParams(ctx, params);
+    const envelope: TurnEnvelope = {
+      protocolVersion: "v1",
+      eventId: "steal-the-vfy",
+      matchId: "42345678-4234-4234-4234-423456789abc",
+      turn: 1,
+      issuedAt: new Date().toISOString(),
+      deadlineAt: new Date(Date.now() + 25_000).toISOString(),
+      state: {
+        selfBalance,
+        opponentBalance,
+        selfFortifiedUntilTurn: null,
+        opponentFortifiedUntilTurn: null,
+      },
+      strategyCommitment: { hash: config.treasuryCommitment },
+    };
+    const opts = {
+      params,
+      salt: config.treasurySalt,
+      commitment: config.treasuryCommitment,
+    };
+    try {
+      if (action.type === "EXTRACT") {
+        if (amount !== params[0]) {
+          // Ask the circuit for the requested spend and let it refuse:
+          // the refusal itself is the evidence that only the committed
+          // size can be proven.
+          try {
+            await generatePolicyProof(envelope, { type: "EXTRACT", amount }, opts);
+            return res.status(500).json({
+              ok: false,
+              error: `circuit proved EXTRACT ${amount} under a cap of ${params[0]} — this must never happen`,
+            });
+          } catch (e) {
+            return res.status(200).json({
+              ok: true,
+              verdict: "REFUSED",
+              layer: "circuit",
+              reason: `spend ${amount} is not the committed size ${params[0]} — the circuit cannot prove it`,
+              circuitError: String((e as Error).message).slice(0, 300),
+              action: null,
+              proof: null,
+              publicSignals: null,
+              valid: false,
+              ...base,
+            });
+          }
+        }
+        const { proof, publicSignals } = await generatePolicyProof(envelope, action, opts);
+        return res.status(200).json({
+          ok: true,
+          verdict: "SAFE",
+          layer: "circuit",
+          reason: `spend ${amount} == committed cap ${params[0]}, balances clear both floors — allowed and proved`,
+          action,
+          proof,
+          publicSignals,
+          valid: true,
+          ...base,
+        });
+      }
+      // FORTIFY / HOLD branch: the spend does not happen; prove the
+      // branch action instead.
+      const { proof, publicSignals } = await generatePolicyProof(envelope, action, opts);
+      const reason =
+        action.type === "FORTIFY"
+          ? `treasury balance ${selfBalance} is below the reserve floor ${params[1]} — fortify instead of spending`
+          : `counterparty balance ${opponentBalance} is at or below the floor ${params[2]} — hold`;
+      return res.status(200).json({
+        ok: true,
+        verdict: "HELD",
+        layer: "circuit",
+        reason,
+        action,
+        proof,
+        publicSignals,
+        valid: true,
+        ...base,
+      });
+    } catch (e) {
+      return res.status(503).json({
+        ok: false,
+        error: `treasury proof generation failed: ${(e as Error).message}`,
+      });
+    }
   });
 
   // Public, read-only proof verification: verify a submitted Groth16

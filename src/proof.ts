@@ -224,3 +224,40 @@ export async function pollKurierJob(
   }
   throw new Error(`Kurier job ${job.jobId} did not reach Finalized within ${timeoutMs}ms (last status: ${current.status}).`);
 }
+
+/**
+ * Read-only Kurier job status (used by GET /proof-status/:jobId).
+ * Returns the status + proof reference (if any) + the raw Kurier reply.
+ * Throws when no API key is configured or Kurier answers non-OK.
+ */
+export async function getKurierJobStatus(
+  jobId: string,
+  apiKey: string = config.kurierApiKey,
+): Promise<{ status?: string; proofReference?: string; raw: unknown }> {
+  if (!apiKey) {
+    throw new Error("KURIER_API_KEY is not configured; cannot check a Kurier job status.");
+  }
+  const res = await fetch(`${config.kurierApiUrl}/job-status/${apiKey}/${encodeURIComponent(jobId)}`, {
+    headers: kurierHeaders(),
+    signal: AbortSignal.timeout(20_000),
+  });
+  const text = await res.text();
+  let raw: unknown = text;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    /* keep raw text */
+  }
+  if (!res.ok) {
+    throw new Error(`Kurier job-status failed: HTTP ${res.status} ${text.slice(0, 300)}`);
+  }
+  const rec = raw as Record<string, unknown>;
+  return {
+    status: typeof rec.status === "string" ? rec.status : undefined,
+    proofReference:
+      (typeof rec.proofReference === "string" && rec.proofReference) ||
+      (typeof rec.txHash === "string" && rec.txHash) ||
+      undefined,
+    raw,
+  };
+}

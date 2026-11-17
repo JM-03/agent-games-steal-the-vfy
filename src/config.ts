@@ -4,6 +4,34 @@ import "dotenv/config";
 import path from "node:path";
 import { parseStrategyParams } from "./strategyParams";
 
+/** Parse an OPTIONAL strategy-params env var: unset/empty → null (feature off). */
+function parseOptionalStrategyParams(raw: string | undefined): number[] | null {
+  if (raw === undefined || raw.trim() === "") return null;
+  return parseStrategyParams(raw); // throws on invalid JSON/shape — fail at startup, never silently
+}
+
+const DEFAULT_TREASURY_ALLOWLIST = [
+  "0x1111111111111111111111111111111111111111",
+  "0x2222222222222222222222222222222222222222",
+];
+
+/** Parse TREASURY_ALLOWLIST (comma-separated 0x addresses). Unset → the demo pair. */
+function parseAllowlist(raw: string | undefined): string[] {
+  const list =
+    raw === undefined || raw.trim() === ""
+      ? DEFAULT_TREASURY_ALLOWLIST
+      : raw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+  for (const a of list) {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(a)) {
+      throw new Error(`TREASURY_ALLOWLIST entry is not a 0x address: ${a}`);
+    }
+  }
+  return list.map((a) => a.toLowerCase());
+}
+
 export const config = {
   port: Number(process.env.PORT || 3000),
   // HMAC secret issued ONCE by the platform (dashboard -> Rotate Secret).
@@ -24,6 +52,20 @@ export const config = {
   // `npm run commitment`; it is saved to gitignored .env.strategy and
   // NEVER printed or logged. Without it no proof can be generated.
   strategySalt: (process.env.STRATEGY_SALT || "").trim(),
+  // Optional treasury-guard policy (the DEFENSIVE strategy [5,50,20,...]).
+  // All three must be set for POST /treasury/check to work. Values come
+  // from .env.strategy-defensive locally (never committed) or Railway
+  // Variables. Unset = the treasury route answers 503 "not configured".
+  // A bad value throws at startup — a bad policy must never silently
+  // produce unprovable actions.
+  treasuryParams: parseOptionalStrategyParams(process.env.STRATEGY_PARAMS_DEFENSIVE),
+  treasurySalt: (process.env.STRATEGY_SALT_DEFENSIVE || "").trim(),
+  treasuryCommitment: (process.env.STRATEGY_COMMITMENT_DEFENSIVE || "").toLowerCase(),
+  // Guard-layer allowlist for the treasury route: recipients the guard will
+  // even consider. The circuit knows balances and caps, NOT addresses —
+  // the allowlist is a plain list, labelled as such everywhere it appears.
+  // Default = the two demo addresses used by npm run demo:treasury.
+  treasuryAllowlist: parseAllowlist(process.env.TREASURY_ALLOWLIST),
   circuitVersion: process.env.CIRCUIT_VERSION || "v1",
   // vk_hash of the vfy-policy circuit, registered on zkVerify mainnet.
   // Source: https://agentgames.zkverify.io/api/circuit-info
