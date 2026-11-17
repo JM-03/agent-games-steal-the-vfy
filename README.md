@@ -1,7 +1,7 @@
 # Steal the VFY — every move provably bound to a pre-committed strategy
 
 A TypeScript/Node agent for the **Steal the VFY** track of zkVerify Agent
-Games (Wildcard). Built by Gogo Maduro(`@jmartil1`, GitHub `JM-03`) with jink. Indonesian version: [`README-id.md`](README-id.md).
+Games (Wildcard). Built by Gogo Maduro (`@jmartil1`, GitHub `JM-03`) with jink. Indonesian version: [`README-id.md`](README-id.md).
 
 **Commit once, prove every move.**
 
@@ -10,7 +10,7 @@ Games (Wildcard). Built by Gogo Maduro(`@jmartil1`, GitHub `JM-03`) with jink. I
 | Try the demo (no install) | [demo page](https://jm-03.github.io/agent-games-steal-the-vfy/demo.html) — try to cheat it yourself, 20-turn replay, treasury guard, refusal demo |
 | Verify one real proof (no repo code) | `npm run verify:proof` — one turn-1 proof vs the official VK (`evidence/proof-turn-1/`) |
 | Watch it try to cheat | `npm run demo:refusal` — 3/3 out-of-policy moves refused by the circuit |
-| Watch the demo video | [demo-video.mp4](docs/demo-video.mp4) — 84 s, no voiceover: 20-turn match 20/20 proved, US WIN 168–28, plus the 3/3 refusal demo |
+| Watch the demo video | [demo-video.mp4](docs/demo-video.mp4) — 84 s: 20-turn match 20/20 proved, US WIN 168–28, plus the 3/3 refusal demo |
 | Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` (401 without signature = fail-closed) |
 | The write-up | [`WRITEUP.md`](WRITEUP.md) — the argument in 1,234 words |
 
@@ -19,14 +19,14 @@ Games (Wildcard). Built by Gogo Maduro(`@jmartil1`, GitHub `JM-03`) with jink. I
 - **Problem:** an agent with a wallet can move money nobody can audit — its own logs prove nothing.
 - **This entry:** every move is proven, in zero knowledge, to stay inside a strategy committed to before acting.
 - **Proof:** Groth16 per move over the official `vfy-policy` circuit, verified on zkVerify mainnet via Kurier — a wrong move has no proof at all; the circuit refuses and the agent answers HOLD.
-- **Evidence:** 20/20 demo turns proved, 40/40 defensive, 3/3 refusals, 24/24 tests — all reproducible with one command.
+- **Evidence:** 20/20 demo turns proved, 40/40 defensive, 3/3 refusals, treasury guard 3/3, 24/24 tests — all reproducible with one command.
 - **Try it:** `npm run demo` — or verify one real proof with `npm run verify:proof`, no repo code needed.
-- **Limits:** Steal tournament locked (Wildcard demo); first Steal Kurier job id still pending.
+- **Limits:** Steal tournament locked (Wildcard demo); Kurier Finalized job `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026).
 
 ## Status
 
 Shipped: proof pipeline (17/17 inputs, Groth16 per turn, self-verified), demo 20/20, defensive 40/40, refusal 3/3, attack script 5/5, 24/24 tests, public demo page.
-Not yet: first Steal Kurier Finalized job id (pending the env-var session)
+Kurier: first Steal Finalized job id `2d523ed8-e255-11f1-838e-1e6a0d14f999` (demo fresh 17 Nov 2026, 20/20, Finalized).
 Tournament: Steal entries locked — this is a Wildcard demo, not a tournament entry.
 
 The enemy here is not a "bad agent" — it is **the unprovable agent**: a black-box agent holding keys to a treasury, where one move outside its mandate can drain funds and nobody can prove who is at fault.
@@ -78,9 +78,9 @@ never in the main `.env.strategy`.
 
 Then `npm run demo:refusal` to watch an illegal move fail (see below).
 
-Or watch the 84-second demo video (no voiceover):
+Or watch the 84-second demo video: [▶ Watch the demo video (84 s)](docs/demo-video.mp4)
 
-<video src="docs/demo-video.mp4" controls width="100%"></video>
+> Note: the video was recorded without a Kurier key, so the Kurier step is skipped in the video by design. The on-chain proof comes from a separate keyed run of the same demo — job `2d523ed8-e255-11f1-838e-1e6a0d14f999`, status Finalized (see "Verified on mainnet" below).
 
 ## Evidence
 
@@ -88,7 +88,7 @@ Every number on this page is reproducible with one command (`npm run demo` / `np
 
 | Check | Result | How to verify |
 |---|---|---|
-| Demo video (84 s, no voiceover) | 20-turn match 20/20 proved, US WIN 168–28, plus the 3/3 refusal demo | [docs/demo-video.mp4](docs/demo-video.mp4) |
+| Demo video (84 s) | 20-turn match 20/20 proved, US WIN 168–28, plus the 3/3 refusal demo | [docs/demo-video.mp4](docs/demo-video.mp4) |
 | Demo match (20 turns, real proofs) | 20/20 proved + locally verified, ~13s, final 168–28 | `npm run demo` |
 | Refusal demo (3 out-of-policy moves) | 3/3 refused by the circuit; agent answered HOLD | `npm run demo:refusal` |
 | Defensive demo (FORTIFY + HOLD live) | 40/40 proved + locally verified; FORTIFY x9, HOLD x4 | `npm run demo:defensive` |
@@ -98,7 +98,7 @@ Every number on this page is reproducible with one command (`npm run demo` / `np
 | Attack script (5 attacks) | 5/5 blocked (tampered commitment, replay, strategy swap, forged proof, unsigned envelope) | `npm run attack` |
 | Demo strategy reveal | Recomputed commitment MATCHES the published one | `npm run reveal:demo` |
 | Why zkVerify (verification cost) | ~272k gas per proof on Ethereum; up to 90% less via zkVerify | See "Why zkVerify — in numbers" |
-| Kurier Finalized job (one proof from the demo) | *pending — run the demo with `KURIER_API_KEY` set; the job id goes in Proof Reference below* | `npm run demo` with the key set |
+| Kurier Finalized job (one proof from the demo) | Finalized — job `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026, demo 20/20) | `npm run demo` with the key set |
 | Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` — preflight + signed turns; unsigned requests are rejected with 401 (correct fail-closed behavior) | `curl .../health` |
 
 ## The refusal test — watch the agent try to cheat and fail
@@ -206,8 +206,10 @@ until Finalized — by a verifier the agent does not control.
 
 The same submit-and-poll path already returned Finalized jobs in live
 scored Gatekeeper rounds (three jobs, 13 Nov). The first Steal
-Finalized job id is pending — it goes in Proof Reference below as soon
-as the demo runs with the key set.
+Finalized job id is `2d523ed8-e255-11f1-838e-1e6a0d14f999` — demo fresh
+17 Nov 2026 (20/20, US WIN 168–28), polled until Finalized:
+`Kurier job submitted, jobId=2d523ed8-e255-11f1-838e-1e6a0d14f999, status=Submitted`
+`Kurier job 2d523ed8-e255-11f1-838e-1e6a0d14f999 final status: Finalized`
 
 **Our server alone can never produce VERIFIED — only Kurier / zkVerify
 mainnet can.** That is the point of the committed proof artifacts: one
@@ -228,8 +230,8 @@ is what it is not:
 - **Local self-verification proves the proof is well-formed — not that
   the check is independent.** A verifier the prover controls is not
   independent; independence comes only from Kurier / zkVerify mainnet.
-  That is why the Finalized receipt matters and why this README marks
-  the Steal job id as pending instead of claiming it.
+  That is why the Finalized receipt matters — and the Steal job id is now
+  Finalized (see "Verified on mainnet" above).
 - **A demo match proves the mechanism — not that EXTRACT 10 wins
   real games.** The demo is a local simulation against a scripted
   opponent; the proofs are real, the score is not a tournament result.
@@ -289,7 +291,7 @@ Poseidon commitment, and a failed proof means the move does not happen
 |---|---|---|
 | What the proof proves | That `score = weighted sum of flags` (arithmetic over inputs the server computed outside the circuit) | That this move was permitted by the committed policy (the circuit enforces the decision itself) |
 | Circuit | Usually custom, with a trusted setup made by its author | Official `vfy-policy` circuit, no setup of our own |
-| On-chain verification | Often none — proofs verified locally only | Submitted to Kurier / zkVerify mainnet; Gatekeeper jobs Finalized (three, 13 Nov); first Steal job id pending |
+| On-chain verification | Often none — proofs verified locally only | Submitted to Kurier / zkVerify mainnet; Gatekeeper jobs Finalized (three, 13 Nov); first Steal job Finalized (`2d523ed8-e255-11f1-838e-1e6a0d14f999`, 17 Nov 2026) |
 | When proving fails | Verdict still returned, with no proof (best-effort) | Agent answers HOLD with no proof (fail-closed); the move does not happen |
 | Refusal | A label in the response — every input has a valid proof, including for a refusal | Cryptographic: a wrong move has no proof at all (circuit assert), demonstrated live in `npm run demo:refusal` |
 | Policy privacy | Usually all inputs public — the policy is visible | Policy hidden behind a Poseidon commitment; verifiable by recompute |
@@ -477,11 +479,10 @@ Public endpoint: `https://agent-games-steal-the-vfy-production.up.railway.app/ag
 - One competition account per person/team, one GitHub per competition
   account.
 
-## Proof reference (placeholder for the Wildcard submission)
+## Proof reference (Wildcard submission)
 
 - Repo: https://github.com/JM-03/agent-games-steal-the-vfy
 - Demo endpoint: `https://agent-games-steal-the-vfy-production.up.railway.app/agent`
 - Circuit vk_hash: `0x6c56509f1c56fd1fd4e9737f906d2220f4b95f1d507f1adf6899085bd74be047`
 - Commitment (params `[10,0,0,0,0,0,0,0]`): `0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39`
-- Kurier job id (one proof from the demo, after KURIER_API_KEY is set):
-  *(fill in after the demo with the key is run — see demo log)*
+- Kurier job id (one proof from the demo, Finalized 17 Nov 2026): `2d523ed8-e255-11f1-838e-1e6a0d14f999`
