@@ -249,6 +249,7 @@
     </div>
     <div class="sim-row"><button class="pill solid" id="trBtn" onclick="checkTreasuryLive()">▶ Ask the treasury guard</button></div>
     <div class="card panel" id="trPanel" style="margin-top:18px"><p style="margin:0;color:var(--mute)">Not asked yet.</p></div>
+    <div class="card panel" style="margin-top:18px"><h3 style="margin-top:0">Treasury audit log — every spend, proven</h3><p style="margin:0;color:var(--mute)" id="trLogEmpty">No spends checked yet. Ask the guard above — every verdict lands here with its proof, so a reviewer can audit the whole treasury history instead of a single check.</p><div id="trLog"></div></div>
   </div>
   <p class="sub" style="margin:16px 0 0; font-size:13px"><em>Precomputed demo — transcripts recorded 16 Nov 2026 from <code>npm run demo:treasury</code> (run it yourself for the live output). The verdicts are not live compute: this page shows what the script printed. The allowlist check is a guard-layer check, not a circuit check — the circuit knows balances and caps, not addresses.</em></p>
 </section>
@@ -734,6 +735,7 @@ async function checkTreasuryLive() {
     if (j.valid) html += '<p><button class="pill solid" onclick="verifyProof(\'trVerifyOut\')">Verify this proof live</button></p><div id="trVerifyOut"></div>';
     if (j.valid) window.__liveProof = { proof: j.proof, publicSignals: j.publicSignals };
     panel.innerHTML = html;
+    logTreasury(j, payload);
   } catch (e) {
     panel.innerHTML = liveUnavailableHTML();
   } finally { btn.disabled = false; }
@@ -748,6 +750,24 @@ async function verifyProof(outId) {
     var j = await r.json();
     out.innerHTML = j.valid ? '<p><strong>Verified live: <span class="ok">VALID</span></strong> — ' + esc(j.note || "") + ' · ' + esc(j.circuit || "") + '</p>' : '<p><strong>Verification: <span class="bad">INVALID</span></strong></p>';
   } catch (e) { out.innerHTML = '<p>Verification request failed.</p>'; }
+}
+async function verifyStored(key, outId) {
+  window.__liveProof = window.__treasuryLog[key];
+  return verifyProof(outId);
+}
+function logTreasury(j, payload) {
+  var empty = document.getElementById("trLogEmpty");
+  if (empty) empty.remove();
+  window.__treasuryLog = window.__treasuryLog || {};
+  window.__treasuryLogN = (window.__treasuryLogN || 0) + 1;
+  var key = "t" + window.__treasuryLogN;
+  if (j.valid) window.__treasuryLog[key] = { proof: j.proof, publicSignals: j.publicSignals };
+  var cls = j.verdict === "SAFE" ? "ok" : "bad";
+  var now = new Date().toLocaleTimeString();
+  var html = '<div class="card panel" style="margin-top:12px"><p><strong>' + now + ' — Spend ' + esc(payload.amount) + ' VFY to <code>' + esc(String(payload.recipient).slice(0, 12)) + '…</code></strong> — Verdict: <span class="' + cls + '">' + esc(j.verdict) + '</span>' + (j.valid ? ' · proof valid: yes' : '') + '</p>';
+  if (j.valid) html += '<p><button class="pill solid" onclick="verifyStored(\'' + key + '\', \'trLogOut-' + key + '\')">Verify this proof live</button></p><div id="trLogOut-' + key + '"></div>';
+  html += '</div>';
+  document.getElementById("trLog").insertAdjacentHTML("afterbegin", html);
 }
 // ---- Init ----
 syncSliders();
