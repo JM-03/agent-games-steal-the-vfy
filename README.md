@@ -1,7 +1,7 @@
 # Steal the VFY — every move provably bound to a pre-committed strategy
 
 A TypeScript/Node agent for the **Steal the VFY** track of zkVerify Agent
-Games (Wildcard). Built by Gogo Maduro (`@jmartil1`, GitHub `JM-03`) with jink. Indonesian version: [`README-id.md`](README-id.md).
+Games (Wildcard). Built by Gogo Maduro (`@jmartil1`, GitHub `JM-03`) with jink.
 
 **Commit once, prove every move.**
 
@@ -101,7 +101,7 @@ Every number on this page is reproducible with one command (`npm run demo` / `np
 | Why zkVerify (verification cost) | ~272k gas per proof on Ethereum; up to 90% less via zkVerify | See "Why zkVerify — in numbers" |
 | Kurier Finalized job (one proof from the demo) | Finalized — job `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026, demo 20/20) | `npm run demo` with the key set |
 | Live endpoint | `https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/agent` — preflight + signed turns; unsigned requests are rejected with 401 (correct fail-closed behavior) | `curl .../health` |
-| Live proof on demand | `GET /demo-turn` returns one fresh real proof (turn 1, EXTRACT 10, self-verified) — no key, no signature needed | `curl https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn` |
+| Live proof on demand | `GET /demo-turn` returns one fresh real proof (turn 1, EXTRACT 10, self-verified) — no key, no signature needed | `curl https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/demo-turn` |
 | Treasury check | `POST /treasury/check` answers a real spend request with a verdict + a real proof when allowed (SAFE / REFUSED / REJECTED / HELD) | `curl -X POST .../treasury/check -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'` |
 | Kurier job status | `GET /proof-status/<jobId>` reads a Kurier job through the server (key stays server-side) | `curl .../proof-status/2d523ed8-e255-11f1-838e-1e6a0d14f999` |
 | Public share | X post with the demo video + repo link, #AgentGames @ZKVProtocol | [x.com/Jmartil1/status/2122677411565465703](https://x.com/Jmartil1/status/2122677411565465703) |
