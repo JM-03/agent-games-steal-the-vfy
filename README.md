@@ -12,7 +12,7 @@ Games (Wildcard). Built by Gogo Maduro (`@jmartil1`, GitHub `JM-03`) with jink. 
 | Watch it try to cheat | `npm run demo:refusal` — 3/3 out-of-policy moves refused by the circuit |
 | Watch the demo video | [demo-video.mp4](docs/demo-video.mp4) — 84 s: 20-turn match 20/20 proved, US WIN 168–28, plus the 3/3 refusal demo |
 | Public share (bonus) | [X post, 17 Nov 2026](https://x.com/Jmartil1/status/2122677411565465703) — demo video + repo link, #AgentGames @ZKVProtocol |
-| Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` (401 without signature = fail-closed) |
+| Live endpoint | `https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/agent` (401 without signature = fail-closed) |
 | The write-up | [`WRITEUP.md`](WRITEUP.md) — the argument in 1,234 words |
 
 ## TL;DR
@@ -100,7 +100,7 @@ Every number on this page is reproducible with one command (`npm run demo` / `np
 | Demo strategy reveal | Recomputed commitment MATCHES the published one | `npm run reveal:demo` |
 | Why zkVerify (verification cost) | ~272k gas per proof on Ethereum; up to 90% less via zkVerify | See "Why zkVerify — in numbers" |
 | Kurier Finalized job (one proof from the demo) | Finalized — job `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026, demo 20/20) | `npm run demo` with the key set |
-| Live endpoint | `https://agent-games-steal-the-vfy-production.up.railway.app/agent` — preflight + signed turns; unsigned requests are rejected with 401 (correct fail-closed behavior) | `curl .../health` |
+| Live endpoint | `https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/agent` — preflight + signed turns; unsigned requests are rejected with 401 (correct fail-closed behavior) | `curl .../health` |
 | Live proof on demand | `GET /demo-turn` returns one fresh real proof (turn 1, EXTRACT 10, self-verified) — no key, no signature needed | `curl https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn` |
 | Treasury check | `POST /treasury/check` answers a real spend request with a verdict + a real proof when allowed (SAFE / REFUSED / REJECTED / HELD) | `curl -X POST .../treasury/check -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'` |
 | Kurier job status | `GET /proof-status/<jobId>` reads a Kurier job through the server (key stays server-side) | `curl .../proof-status/2d523ed8-e255-11f1-838e-1e6a0d14f999` |
@@ -468,7 +468,7 @@ only useful on a host with a persistent volume; Railway has none
 attached, so leave it unset there.
 After changing Variables, click "Apply change" → Deploy — Railway does
 not auto-deploy env-var changes.
-Public endpoint: `https://agent-games-steal-the-vfy-production.up.railway.app/agent`
+Public endpoint: `https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/agent`
 (register the full handler path).
 
 ## Honest limits
@@ -507,7 +507,7 @@ Public endpoint: `https://agent-games-steal-the-vfy-production.up.railway.app/ag
 ## Proof reference (Wildcard submission)
 
 - Repo: https://github.com/JM-03/agent-games-steal-the-vfy
-- Demo endpoint: `https://agent-games-steal-the-vfy-production.up.railway.app/agent`
+- Demo endpoint: `https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/agent`
 - Circuit vk_hash: `0x6c56509f1c56fd1fd4e9737f906d2220f4b95f1d507f1adf6899085bd74be047`
 - Commitment (params `[10,0,0,0,0,0,0,0]`): `0x0b9f4672eb0b10bba098b648216126cb6256f43b0879833483b7f4631f61cb39`
 - Kurier job id (one proof from the demo, Finalized 17 Nov 2026): `2d523ed8-e255-11f1-838e-1e6a0d14f999`
