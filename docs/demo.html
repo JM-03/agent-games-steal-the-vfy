@@ -274,7 +274,7 @@
   <div class="card sim" style="padding:24px 28px">
     <div class="sim-row" style="margin:0">
       <button class="pill solid" id="liveBtn" onclick="askLiveTurn()">▶ Ask the live agent for one real turn</button>
-      <span class="params-line">GET <code>https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn</code></span>
+      <span class="params-line">GET <code>https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/demo-turn</code></span>
     </div>
     <div class="card panel" id="livePanel" style="margin-top:18px"><p style="margin:0;color:var(--mute)">Not asked yet. Turn 1, balances 100/100, committed strategy [10, 0, 0, 0, 0, 0, 0, 0] — expect EXTRACT 10 with a fresh Groth16 proof.</p></div>
   </div>
@@ -449,8 +449,8 @@ npm run verify:proof   # verify one real proof, zero repo code
 npm run reveal:demo    # reveal the DEMO strategy, recompute its commitment
 npm test               # 24/24 tests
 npm run test:live      # 11/11 live-endpoint tests
-curl https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn  # one fresh real proof, no key needed
-curl -X POST https://agent-games-steal-the-vfy-production.up.railway.app/treasury/check -H 'content-type: application/json' -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'  # ask the treasury guard</pre>
+curl https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/demo-turn  # one fresh real proof, no key needed
+curl -X POST https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/treasury/check -H 'content-type: application/json' -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'  # ask the treasury guard</pre>
 </section>
 
 <footer>
