@@ -22,12 +22,12 @@ Games (Wildcard). Built by Gogo Maduro (`@jmartil1`, GitHub `JM-03`) with jink.
 - **Proof:** Groth16 per move over the official `vfy-policy` circuit, verified on zkVerify mainnet via Kurier — a wrong move has no proof at all; the circuit refuses and the agent answers HOLD.
 - **Evidence:** 20/20 demo turns proved, 40/40 defensive, 3/3 refusals, treasury guard 3/3, 24/24 tests — all reproducible with one command.
 - **Try it:** `npm run demo` — or verify one real proof with `npm run verify:proof`, no repo code needed.
-- **Limits:** Steal tournament locked (Wildcard demo); Kurier Finalized job `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026).
+- **Limits:** Steal tournament locked (Wildcard demo); Kurier Finalized jobs `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026) and `f05f77b5-e621-11f1-838e-1e6a0d14f999` (22 Nov 2026, treasury policy).
 
 ## Status
 
 Shipped: proof pipeline (17/17 inputs, Groth16 per turn, self-verified), demo 20/20, defensive 40/40, refusal 3/3, attack script 5/5, 24/24 tests, public demo page.
-Kurier: first Steal Finalized job id `2d523ed8-e255-11f1-838e-1e6a0d14f999` (demo fresh 17 Nov 2026, 20/20, Finalized).
+Kurier: first Steal Finalized job id `2d523ed8-e255-11f1-838e-1e6a0d14f999` (demo fresh 17 Nov 2026, 20/20, Finalized). Second: `f05f77b5-e621-11f1-838e-1e6a0d14f999` (defensive demo fresh 22 Nov 2026, 40/40, Finalized; tx `0x52d3db494ec6287c69e736deb52b9bbfb1e056600c847a96c3537605a45240e1`).
 Tournament: Steal entries locked — this is a Wildcard demo, not a tournament entry.
 
 The enemy here is not a "bad agent" — it is **the unprovable agent**: a black-box agent holding keys to a treasury, where one move outside its mandate can drain funds and nobody can prove who is at fault.
@@ -100,6 +100,7 @@ Every number on this page is reproducible with one command (`npm run demo` / `np
 | Demo strategy reveal | Recomputed commitment MATCHES the published one | `npm run reveal:demo` |
 | Why zkVerify (verification cost) | ~272k gas per proof on Ethereum; up to 90% less via zkVerify | See "Why zkVerify — in numbers" |
 | Kurier Finalized job (one proof from the demo) | Finalized — job `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026, demo 20/20) | `npm run demo` with the key set |
+| Kurier Finalized job (treasury policy) | Finalized — job `f05f77b5-e621-11f1-838e-1e6a0d14f999` (22 Nov 2026, defensive 40/40) | `npm run demo:defensive` with the key set |
 | Live endpoint | `https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/agent` — preflight + signed turns; unsigned requests are rejected with 401 (correct fail-closed behavior) | `curl .../health` |
 | Live proof on demand | `GET /demo-turn` returns one fresh real proof (turn 1, EXTRACT 10, self-verified) — no key, no signature needed | `curl https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/demo-turn` |
 | Treasury check | `POST /treasury/check` answers a real spend request with a verdict + a real proof when allowed (SAFE / REFUSED / REJECTED / HELD) | `curl -X POST .../treasury/check -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'` |
@@ -218,6 +219,12 @@ Finalized job id is `2d523ed8-e255-11f1-838e-1e6a0d14f999` — demo fresh
 
 On-chain: [Subscan extrinsic `0xf73f1c21…`](https://zkverify.subscan.io/extrinsic/0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b)
 (txHash `0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b`).
+
+Second Steal Finalized job id is `f05f77b5-e621-11f1-838e-1e6a0d14f999` — defensive demo fresh 22 Nov 2026 (40/40, US WIN 180–20), polled until Finalized:
+`Kurier job submitted, jobId=f05f77b5-e621-11f1-838e-1e6a0d14f999, status=Submitted`
+`Kurier job f05f77b5-e621-11f1-838e-1e6a0d14f999 final status: Finalized`
+On-chain: [Subscan extrinsic `0x52d3db49…`](https://zkverify.subscan.io/extrinsic/0x52d3db494ec6287c69e736deb52b9bbfb1e056600c847a96c3537605a45240e1) (txHash `0x52d3db494ec6287c69e736deb52b9bbfb1e056600c847a96c3537605a45240e1`).
+
 The live endpoint reports the same receipt at `GET /demo` (`kurier`) and
 reads any Kurier job at `GET /proof-status/<jobId>`.
 
