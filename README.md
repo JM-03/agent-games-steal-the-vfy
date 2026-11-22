@@ -27,7 +27,7 @@ Games (Wildcard). Built by Gogo Maduro (`@jmartil1`, GitHub `JM-03`) with jink.
 ## Status
 
 Shipped: proof pipeline (17/17 inputs, Groth16 per turn, self-verified), demo 20/20, defensive 40/40, refusal 3/3, attack script 5/5, 24/24 tests, public demo page.
-Kurier: first Steal Finalized job id `2d523ed8-e255-11f1-838e-1e6a0d14f999` (demo fresh 17 Nov 2026, 20/20, Finalized). Second: `f05f77b5-e621-11f1-838e-1e6a0d14f999` (defensive demo fresh 22 Nov 2026, 40/40, Finalized; tx `0x52d3db494ec6287c69e736deb52b9bbfb1e056600c847a96c3537605a45240e1`).
+Kurier: first Steal Finalized job id `2d523ed8-e255-11f1-838e-1e6a0d14f999` (demo fresh 17 Nov 2026, 20/20, Finalized). Second: `f05f77b5-e621-11f1-838e-1e6a0d14f999` (defensive demo fresh 22 Nov 2026, 40/40, Finalized; tx `0x52d3db494ec6287c69e736deb52b9bbfb1e056600c847a96c3537605a45240e1`). Third: `21ebc73c-e630-11f1-838e-1e6a0d14f999` (video run 22 Nov 2026, demo 20/20, Finalized; tx `0x075eaae3cbf8819dfbb25867f62cbf414e0f99c20c95903ddf3d7e8b72ae1818`).
 Tournament: Steal entries locked — this is a Wildcard demo, not a tournament entry.
 
 The enemy here is not a "bad agent" — it is **the unprovable agent**: a black-box agent holding keys to a treasury, where one move outside its mandate can drain funds and nobody can prove who is at fault.
@@ -81,7 +81,7 @@ Then `npm run demo:refusal` to watch an illegal move fail (see below).
 
 Or watch the 84-second demo video: [▶ Watch the demo video (84 s)](docs/demo-video.mp4)
 
-> Note: the video was recorded without a Kurier key, so the Kurier step is skipped in the video by design. The on-chain proof comes from a separate keyed run of the same demo — job `2d523ed8-e255-11f1-838e-1e6a0d14f999`, status Finalized (see "Verified on mainnet" below).
+> Note: the video was recorded 22 Nov 2026 with a Kurier key, so the Kurier step runs in the video: turn 1's proof is submitted and reaches Finalized on mainnet — job `21ebc73c-e630-11f1-838e-1e6a0d14f999`, tx `0x075eaae3cbf8819dfbb25867f62cbf414e0f99c20c95903ddf3d7e8b72ae1818` (see "Verified on mainnet" below).
 
 ## Evidence
 
@@ -101,6 +101,7 @@ Every number on this page is reproducible with one command (`npm run demo` / `np
 | Why zkVerify (verification cost) | ~272k gas per proof on Ethereum; up to 90% less via zkVerify | See "Why zkVerify — in numbers" |
 | Kurier Finalized job (one proof from the demo) | Finalized — job `2d523ed8-e255-11f1-838e-1e6a0d14f999` (17 Nov 2026, demo 20/20) | `npm run demo` with the key set |
 | Kurier Finalized job (treasury policy) | Finalized — job `f05f77b5-e621-11f1-838e-1e6a0d14f999` (22 Nov 2026, defensive 40/40) | `npm run demo:defensive` with the key set |
+| Kurier Finalized job (demo video run) | Finalized — job `21ebc73c-e630-11f1-838e-1e6a0d14f999` (22 Nov 2026, demo 20/20 — the run shown in the video) | `npm run demo` with the key set |
 | Live endpoint | `https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/agent` — preflight + signed turns; unsigned requests are rejected with 401 (correct fail-closed behavior) | `curl .../health` |
 | Live proof on demand | `GET /demo-turn` returns one fresh real proof (turn 1, EXTRACT 10, self-verified) — no key, no signature needed | `curl https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/demo-turn` |
 | Treasury check | `POST /treasury/check` answers a real spend request with a verdict + a real proof when allowed (SAFE / REFUSED / REJECTED / HELD) | `curl -X POST .../treasury/check -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'` |
@@ -224,6 +225,11 @@ Second Steal Finalized job id is `f05f77b5-e621-11f1-838e-1e6a0d14f999` — defe
 `Kurier job submitted, jobId=f05f77b5-e621-11f1-838e-1e6a0d14f999, status=Submitted`
 `Kurier job f05f77b5-e621-11f1-838e-1e6a0d14f999 final status: Finalized`
 On-chain: [Subscan extrinsic `0x52d3db49…`](https://zkverify.subscan.io/extrinsic/0x52d3db494ec6287c69e736deb52b9bbfb1e056600c847a96c3537605a45240e1) (txHash `0x52d3db494ec6287c69e736deb52b9bbfb1e056600c847a96c3537605a45240e1`).
+
+Third Steal Finalized job id is `21ebc73c-e630-11f1-838e-1e6a0d14f999` — demo fresh 22 Nov 2026 (20/20, US WIN 168–28), the keyed run shown in the demo video, polled until Finalized:
+`Kurier job submitted, jobId=21ebc73c-e630-11f1-838e-1e6a0d14f999, status=Submitted`
+`Kurier job 21ebc73c-e630-11f1-838e-1e6a0d14f999 final status: Finalized`
+On-chain: [Subscan extrinsic `0x075eaae3…`](https://zkverify.subscan.io/extrinsic/0x075eaae3cbf8819dfbb25867f62cbf414e0f99c20c95903ddf3d7e8b72ae1818) (txHash `0x075eaae3cbf8819dfbb25867f62cbf414e0f99c20c95903ddf3d7e8b72ae1818`).
 
 The live endpoint reports the same receipt at `GET /demo` (`kurier`) and
 reads any Kurier job at `GET /proof-status/<jobId>`.
