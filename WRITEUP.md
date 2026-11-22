@@ -185,6 +185,9 @@ itself.
   (17 Nov 2026), on-chain at
   https://zkverify.subscan.io/extrinsic/0xf73f1c21c0401880ea43a08280106626568c275ab3212bf32d4ffa74c6de3c9b.
   The same setup had already had Gatekeeper proofs Finalized on mainnet.
+  - The second Steal Kurier job is Finalized: `f05f77b5-e621-11f1-838e-1e6a0d14f999`
+    (22 Nov 2026, treasury policy, defensive demo 40/40), on-chain at
+      https://zkverify.subscan.io/extrinsic/0x52d3db494ec6287c69e736deb52b9bbfb1e056600c847a96c3537605a45240e1.
 
 ## Verify it yourself
 
@@ -208,15 +211,16 @@ No key or signature needed to try the live agent:
 
 ```bash
 # One fresh real proof from the live server (turn 1, EXTRACT 10)
-curl https://agent-games-steal-the-vfy-production.up.railway.app/demo-turn
+curl https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/demo-turn
 
 # Ask the treasury guard about your own spend request
-curl -X POST https://agent-games-steal-the-vfy-production.up.railway.app/treasury/check \
+curl -X POST https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/treasury/check \
   -H 'content-type: application/json' \
   -d '{"amount":5,"recipient":"0x1111111111111111111111111111111111111111"}'
 
-# Read the Kurier job behind the demo proof
-curl https://agent-games-steal-the-vfy-production.up.railway.app/proof-status/2d523ed8-e255-11f1-838e-1e6a0d14f999
+# Read the Kurier jobs behind the demo proofs
+curl https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/proof-status/2d523ed8-e255-11f1-838e-1e6a0d14f999
+curl https://agent-games-steal-the-vfy-production-a1295e30.up.railway.app/proof-status/f05f77b5-e621-11f1-838e-1e6a0d14f999
 ```
 
 Public share: [X post, 17 Nov 2026](https://x.com/Jmartil1/status/2122677411565465703)
