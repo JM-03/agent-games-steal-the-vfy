@@ -171,6 +171,7 @@
   <p class="kicker">zkVerify Agent Games — Wildcard</p>
   <h1>Every move provably bound to a <span class="grad">pre-committed strategy</span></h1>
   <p class="lede">An agent that can only do what it committed to before acting — proven in zero knowledge. Before a match, the owner picks 8 strategy numbers and a random salt and publishes only a Poseidon commitment; the strategy stays secret. Each turn, the agent decides strictly by the official circuit's decision list, generates a Groth16 proof against the official <code>vfy-policy</code> circuit, self-verifies it locally, and only then answers. A wrong move cannot be proven at all — the circuit refuses, and the agent fails closed to HOLD.</p>
+<p class="sub" style="text-align:center; max-width:720px; margin:18px auto 0">The game below is the demo. The product is the treasury guard: the same commit → prove → execute pattern with real money at stake — no spend executes without a Groth16 proof, and a spend over the cap has no proof at all.</p>
   <div class="cta-row">
     <a class="pill solid" href="#play">▶ Play a match</a>
     <a class="pill" href="#rob">Try to rob it</a>
@@ -232,7 +233,7 @@
   <p class="label">If this were real money</p>
   <h2>The treasury guard</h2>
   <p class="sub">An agent holding the keys to a 100 VFY treasury. Before the keys change hands, the owner commits a policy — spend capped at 5 VFY per move, a reserve floor of 50 (fortify instead of spending below it), a counterparty floor of 20 (hold below it) — under commitment <code>0x1b63…a2a24</code> (strategy <code>[5,50,20,0,0,0,0,0]</code>). The agent can only spend what the policy allows, and every spend needs a Groth16 proof against the official circuit. Three spends, three verdicts — run by <code>npm run demo:treasury</code>, <strong>3/3 behaved as committed</strong> (1 refused by the circuit, 1 proved, 1 rejected by the allowlist). Click one — <strong>the refused one is shown first on purpose</strong>.</p>
-  <p class="sub"><em>This is not a wallet product. Steal the VFY is a game demo — but the mechanism is the same one that guards the match moves on this page: commit first, prove every move, fail closed. What changes here is only what is at stake: points in the match, money in the treasury.</em></p>
+  <p class="sub"><em>The game is the demo — the guard is the product. The mechanism here is the same one that guards the match moves on this page: commit first, prove every move, fail closed. What changes is only what is at stake: points in the match, money in the treasury.</em></p>
   <div class="choices">
     <button class="choice card" onclick="showTreasury(1)" id="tbtn1" aria-pressed="true"><b>1 — Spend 11 VFY</b><span>Over the committed cap of 5. The circuit is asked first.</span><span class="tag refused">REFUSED</span></button>
     <button class="choice card" onclick="showTreasury(2)" id="tbtn2" aria-pressed="false"><b>2 — Spend 5 VFY</b><span>To allowlisted <code>0x1111…1111</code>. Within the cap, to a known address.</span><span class="tag safe">SAFE + proof</span></button>
