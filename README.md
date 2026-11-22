@@ -18,7 +18,7 @@ Games (Wildcard). Built by Gogo Maduro (`@jmartil1`, GitHub `JM-03`) with jink.
 ## TL;DR
 
 - **Problem:** an agent with a wallet can move money nobody can audit — its own logs prove nothing.
-- **This entry:** every move is proven, in zero knowledge, to stay inside a strategy committed to before acting.
+- **This entry:** every move is proven, in zero knowledge, to stay inside a strategy committed to before acting. The game is the demo — the product is the treasury guard: no spend executes without a proof, and a spend over the cap has no proof at all.
 - **Proof:** Groth16 per move over the official `vfy-policy` circuit, verified on zkVerify mainnet via Kurier — a wrong move has no proof at all; the circuit refuses and the agent answers HOLD.
 - **Evidence:** 20/20 demo turns proved, 40/40 defensive, 3/3 refusals, treasury guard 3/3, 24/24 tests — all reproducible with one command.
 - **Try it:** `npm run demo` — or verify one real proof with `npm run verify:proof`, no repo code needed.
